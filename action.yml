@@ -1,0 +1,142 @@
+name: Omni-Auditor
+description: "Run Omni-Auditor spectral static analysis and export SARIF for GitHub Security tab."
+author: "Omni-Auditor Contributors"
+branding:
+  icon: shield
+  color: purple
+
+inputs:
+  path:
+    description: "Path to a Python file or directory to analyse."
+    required: false
+    default: "."
+  threshold:
+    description: "CRITICAL risk tier threshold (0.0–1.0)."
+    required: false
+    default: "0.7"
+  diff-baseline:
+    description: "Optional project ID of a saved baseline to diff against."
+    required: false
+    default: ""
+
+outputs:
+  sarif-path:
+    description: "Absolute path to the generated SARIF file."
+    value: ${{ steps.analysis.outputs.sarif-path }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install Omni-Auditor
+      run: python3 -m pip install "${{ github.action_path }}"
+      shell: bash
+
+    - name: Run analysis
+      id: analysis
+      env:
+        INPUT_PATH: ${{ inputs.path }}
+        INPUT_THRESHOLD: ${{ inputs.threshold }}
+        INPUT_DIFF_BASELINE: ${{ inputs.diff-baseline }}
+      run: |
+        python3 << 'PYEOF'
+        import asyncio
+        import json
+        import os
+        import sys
+        from pathlib import Path
+
+        from src.main import OmniAuditor
+        from src.sarif_exporter import export_sarif
+        from src.engine.baseline import BaselineManager, build_spectral_snapshot
+        from src.engine.diff import SpectralDiffEngine
+
+        scan_path = Path(os.environ["INPUT_PATH"]).resolve()
+        threshold = float(os.environ["INPUT_THRESHOLD"])
+        baseline_id = os.environ["INPUT_DIFF_BASELINE"].strip() or None
+        out_path = Path(os.environ.get("RUNNER_TEMP", ".")) / "omni-auditor-results.sarif"
+
+        if scan_path.is_file():
+            files = [scan_path]
+        else:
+            files = [
+                p for p in scan_path.rglob("*.py")
+                if not any(
+                    part.startswith(".")
+                    or part in {"venv", ".venv", "__pycache__", "node_modules", "site-packages"}
+                    for part in p.parts
+                )
+            ]
+
+        if not files:
+            empty_sarif = {
+                "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+                "version": "2.1.0",
+                "runs": [{
+                    "tool": {"driver": {"name": "Omni-Auditor", "version": "0.1.0"}},
+                    "results": [],
+                }]
+            }
+            out_path.write_text(json.dumps(empty_sarif, indent=2), encoding="utf-8")
+            print(f"No Python files found in {scan_path}")
+        else:
+            all_results = []
+            for f in files:
+                code = f.read_text(encoding="utf-8")
+                auditor = OmniAuditor(
+                    code,
+                    file_path=str(f),
+                    no_ui=True,
+                    critical_threshold=threshold,
+                )
+                report = asyncio.run(auditor.run())
+                sarif = export_sarif(report, file_path=str(f))
+                all_results.extend(sarif["runs"][0]["results"])
+
+                if baseline_id:
+                    baseline_mgr = BaselineManager()
+                    try:
+                        baseline_data = baseline_mgr.load(baseline_id)
+                        current_snapshot = build_spectral_snapshot(
+                            project_id=baseline_id,
+                            analysis=report.analysis,
+                            validation=report.validation,
+                            security=report.security,
+                            final_report=report,
+                        )
+                        diff_engine = SpectralDiffEngine(baseline_data, current_snapshot)
+                        delta = diff_engine.compute(project_id=baseline_id)
+                        all_results.append({
+                            "ruleId": "spectral-drift",
+                            "level": "warning" if delta.risk_trend in ("DEGRADED", "FRACTURED") else "note",
+                            "message": {
+                                "text": (
+                                    f"Spectral drift for {f.name}: {delta.risk_trend} "
+                                    f"(drift_score={delta.drift_score:.4f})"
+                                )
+                            },
+                            "locations": [{
+                                "physicalLocation": {
+                                    "artifactLocation": {"uri": str(f)},
+                                    "region": {"startLine": 1}
+                                }
+                            }],
+                        })
+                    except FileNotFoundError:
+                        print(f"::warning::Baseline '{baseline_id}' not found. Skipping diff for {f.name}.")
+
+            merged = {
+                "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+                "version": "2.1.0",
+                "runs": [{
+                    "tool": {"driver": {"name": "Omni-Auditor", "version": "0.1.0"}},
+                    "results": all_results,
+                }]
+            }
+            out_path.write_text(json.dumps(merged, indent=2), encoding="utf-8")
+
+        print(f"sarif-path={out_path}")
+        gh_output = os.environ.get("GITHUB_OUTPUT")
+        if gh_output:
+            with open(gh_output, "a", encoding="utf-8") as fh:
+                fh.write(f"sarif-path={out_path}\n")
+      shell: bash

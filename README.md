@@ -5,16 +5,18 @@
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 ![Code style: strict typing](https://img.shields.io/badge/code%20style-strict%20typing-blue)
+![PyPI](https://img.shields.io/pypi/v/omni-auditor)
+![CI](https://github.com/SMIYAK/omni-auditor/actions/workflows/ci.yml/badge.svg)
 
 ---
 
 ## Installation
 
 ```bash
-pip install -r requirements.txt
+pip install omni-auditor
 ```
 
-Requirements: `numpy`, `scipy`, `rich`.
+Requirements: Python ≥3.10, `numpy`, `scipy`, `rich`.
 
 ---
 
@@ -59,6 +61,68 @@ The **FusionEngine** adaptively weights the three vectors (56-D + 16-D + 18-D = 
 | `--threshold FLOAT` | Override the CRITICAL risk tier threshold (default: `0.7`). |
 | `--save-baseline ID` | Persist the current analysis snapshot as a baseline under the given project ID. |
 | `--diff ID` | Load a saved baseline and compute structural drift against the current file. |
+
+---
+
+## GitHub Action
+
+Add Omni-Auditor to your CI pipeline and surface findings in the **GitHub Security tab** via SARIF.
+
+```yaml
+name: Omni-Auditor Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Omni-Auditor
+        id: omni-auditor
+        uses: SMIYAK/omni-auditor@main
+        with:
+          path: "."
+          threshold: "0.7"
+
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: ${{ steps.omni-auditor.outputs.sarif-path }}
+```
+
+| Input | Default | Description |
+|-------|---------|-------------|
+| `path` | `.` | Python file or directory to scan. |
+| `threshold` | `0.7` | CRITICAL risk tier threshold. |
+| `diff-baseline` | `""` | Optional baseline project ID for drift detection. |
+
+---
+
+## SARIF Export
+
+Omni-Auditor natively exports **SARIF v2.1.0** for integration with GitHub Advanced Security, VS Code SARIF viewers, and other compatible platforms.
+
+- **Security findings** are mapped to SARIF `results` with accurate severity levels (`error`, `warning`, `note`), line locations, and rule IDs.
+- **Structural anomalies** (high Anomaly Z-score) are emitted as `warning`-level results under rule ID `structural-anomaly`.
+
+```python
+from src.main import OmniAuditor
+from src.sarif_exporter import export_sarif
+import asyncio, json
+
+auditor = OmniAuditor(source_code, file_path="app.py", no_ui=True)
+report = asyncio.run(auditor.run())
+sarif = export_sarif(report, file_path="app.py")
+print(json.dumps(sarif, indent=2))
+```
 
 ---
 

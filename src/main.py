@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import bisect
 import contextlib
 import dataclasses
 import json
@@ -47,7 +48,7 @@ from typing import Literal
 import numpy as np
 from numpy.typing import NDArray
 
-from rich.console import Console
+from rich.console import Console, Group
 from rich.layout import Layout
 from rich.live import Live
 from rich.panel import Panel
@@ -288,7 +289,7 @@ class RichUIRenderer:
             Layout(name="header", size=3),
             Layout(name="progress", size=3),
             Layout(name="main"),
-            Layout(name="footer", size=5),
+            Layout(name="footer", minimum_size=10),
         )
         self.layout["header"].update(
             Panel(Text(title, style="bold magenta", justify="center"))
@@ -359,30 +360,41 @@ class RichUIRenderer:
         table.add_column("Function", style="cyan", no_wrap=True)
         table.add_column("Line", justify="right")
         table.add_column("Blocks", justify="right")
-        table.add_column("Spectral Radius", justify="right")
-        table.add_column("Graph Energy", justify="right")
         table.add_column("Anomaly Z", justify="right")
+        table.add_column("Status", justify="center")
 
         if self._analysis is None:
             self.layout["functions"].update(Panel(table))
             return
 
+        sec_details = self._get_security_details_by_function()
+        messages: list[Text] = []
+
         for key, profile in self._analysis.function_spectrals.items():
             line = self._extract_line(key)
             n_blocks = profile.adjacency_undirected.shape[0]
-            spec_radius = f"{profile.spectral_radius:.2f}"
-            g_energy = f"{profile.graph_energy:.2f}"
+            func_name = key.split("@")[0]
 
-            z_score = "—"
+            z_val: float | None = None
             if self._validation is not None:
                 func_rep = self._validation.function_reports.get(key)
                 if func_rep is not None:
-                    z_score = f"{func_rep.renyi_z_score:.2f}"
+                    z_val = func_rep.renyi_z_score
 
-            table.add_row(key.split("@")[0], line, str(n_blocks), spec_radius, g_energy, z_score)
+            z_score_str = f"{z_val:.2f}" if z_val is not None else "—"
+            status = self._status_for_function(func_name, z_val, n_blocks, sec_details)
+            table.add_row(func_name, line, str(n_blocks), z_score_str, status)
+
+            msg = self._function_message(func_name, z_val, n_blocks, sec_details)
+            if msg is not None:
+                messages.append(msg)
+
+        content: Table | Group = table
+        if messages:
+            content = Group(table, Text(), *messages)
 
         self.layout["functions"].update(
-            Panel(table, title="[b]Spectral & Statistical Analysis[/b]")
+            Panel(content, title="[b]Spectral & Statistical Analysis[/b]")
         )
 
     def _render_security_table(self) -> None:
@@ -452,19 +464,34 @@ class RichUIRenderer:
         color = color_map.get(tier, "white")
         w_a, w_v, w_s = self._final.fusion_weights
 
-        text = Text.assemble(
-            ("Unified Risk Score: ", "bold"),
-            (f"{score:.4f}  ", f"{color} bold"),
-            (f"[{tier}]", f"{color} bold underline"),
-            "\n",
-            (f"Fusion weights  ", "dim"),
-            (f"Analyzer={w_a:.2f}  ", "cyan"),
-            (f"Validator={w_v:.2f}  ", "yellow"),
-            (f"Security={w_s:.2f}", "magenta"),
+        recommendations = self._build_recommendations()
+
+        lines: list[Text | Group] = [
+            Text.assemble(
+                ("Unified Risk Score: ", "bold"),
+                (f"{score:.4f}  ", f"{color} bold"),
+                (f"[{tier}]", f"{color} bold underline"),
+            ),
+        ]
+
+        if recommendations:
+            lines.append(Text("Recommendations:", style="bold underline"))
+            for i, rec in enumerate(recommendations, 1):
+                lines.append(Text(f"{i}. {rec}"))
+        else:
+            lines.append(Text("🟢 No critical issues detected.", style="bold green"))
+
+        lines.append(
+            Text.assemble(
+                (f"Fusion weights  ", "dim"),
+                (f"Analyzer={w_a:.2f}  ", "cyan"),
+                (f"Validator={w_v:.2f}  ", "yellow"),
+                (f"Security={w_s:.2f}", "magenta"),
+            ),
         )
 
         self.layout["footer"].update(
-            Panel(text, title="[b]Final Assessment[/b]", border_style=color)
+            Panel(Group(*lines), title="[b]Final Assessment[/b]", border_style=color)
         )
 
     @staticmethod
@@ -473,6 +500,142 @@ class RichUIRenderer:
             return key.split("@")[1].split(":")[0]
         except IndexError:
             return "?"
+
+    def _func_line_map(self) -> list[tuple[int, str]]:
+        """Return sorted list of (start_line, func_name) for all functions."""
+        if self._analysis is None:
+            return []
+        func_lines: list[tuple[int, str]] = []
+        for key in self._analysis.function_spectrals:
+            line_str = self._extract_line(key)
+            name = key.split("@")[0]
+            try:
+                func_lines.append((int(line_str), name))
+            except ValueError:
+                continue
+        func_lines.sort(key=lambda x: x[0])
+        return func_lines
+
+    def _get_security_details_by_function(self) -> dict[str, dict[str, int]]:
+        """Map security threats to function names and return severity breakdowns."""
+        if self._security is None or self._analysis is None:
+            return {}
+        func_lines = self._func_line_map()
+        if not func_lines:
+            return {}
+        lines = [fl[0] for fl in func_lines]
+        names = [fl[1] for fl in func_lines]
+        details: dict[str, dict[str, int]] = {}
+        for threat in self._security.threats:
+            idx = bisect.bisect_right(lines, threat.line_number) - 1
+            if idx >= 0:
+                fname = names[idx]
+                details.setdefault(fname, {})
+                details[fname][threat.severity] = details[fname].get(threat.severity, 0) + 1
+        return details
+
+    def _status_for_function(
+        self,
+        func_name: str,
+        z_score: float | None,
+        n_blocks: int,
+        sec_details: dict[str, dict[str, int]],
+    ) -> Text:
+        """Return a rich Text object representing the function status."""
+        sev_counts = sec_details.get(func_name, {})
+        if sev_counts.get("CRITICAL", 0) > 0 or sev_counts.get("HIGH", 0) > 0:
+            return Text("🔴 Security Critical", style="bold red")
+        if sum(sev_counts.values()) > 0:
+            return Text("⚠️ Fractured", style="bold yellow")
+        if z_score is not None and z_score > 1.0 and n_blocks > 10:
+            return Text("🔴 Critical", style="bold red")
+        if (z_score is not None and z_score >= 0.5) or n_blocks > 10:
+            return Text("🟡 Warning", style="bold yellow")
+        if z_score is None:
+            return Text("—", style="dim")
+        return Text("🟢 Healthy", style="bold green")
+
+    def _function_message(
+        self,
+        func_name: str,
+        z_score: float | None,
+        n_blocks: int,
+        sec_details: dict[str, dict[str, int]],
+    ) -> Text | None:
+        """Return an actionable footer message for a single function, or None."""
+        sev_counts = sec_details.get(func_name, {})
+        count = sum(sev_counts.values())
+        if count > 0:
+            critical_count = sev_counts.get("CRITICAL", 0)
+            if critical_count > 0:
+                plural = "s" if critical_count > 1 else ""
+                return Text(
+                    f"⚠️ {func_name}: Contains {critical_count} CRITICAL security issue{plural}. Immediate review required.",
+                    style="bold red",
+                )
+            plural = "s" if count > 1 else ""
+            return Text(
+                f"⚠️ {func_name}: Contains {count} security issue{plural}. Review required.",
+                style="bold yellow",
+            )
+        if z_score is not None and z_score > 1.0 and n_blocks > 10:
+            return Text(
+                f"🔴 {func_name}: High structural complexity ({n_blocks} blocks). Consider extracting inner loops into helper functions.",
+                style="bold red",
+            )
+        if z_score is not None and z_score < 0.5 and count == 0:
+            return Text(
+                f"🟢 {func_name} is structurally healthy.",
+                style="bold green",
+            )
+        return None
+
+    def _build_recommendations(self) -> list[str]:
+        """Generate top-3 actionable recommendations sorted by priority."""
+        if self._final is None:
+            return []
+        recs: list[tuple[tuple[int, int], str]] = []
+
+        if self._security is not None and self._analysis is not None:
+            func_lines = self._func_line_map()
+            lines = [fl[0] for fl in func_lines]
+            names = [fl[1] for fl in func_lines]
+            for threat in self._security.threats:
+                idx = bisect.bisect_right(lines, threat.line_number) - 1
+                func_name = names[idx] if idx >= 0 else "?"
+                if threat.severity == "CRITICAL":
+                    text = f"[SECURITY] Remove {threat.node_path} from {func_name} (line {threat.line_number})"
+                    recs.append(((0, threat.line_number), text))
+                elif threat.severity == "HIGH":
+                    text = f"[SECURITY] Review {threat.node_path} from {func_name} (line {threat.line_number})"
+                    recs.append(((1, threat.line_number), text))
+
+        if self._analysis is not None and self._validation is not None:
+            for key, profile in self._analysis.function_spectrals.items():
+                func_name = key.split("@")[0]
+                n_blocks = profile.adjacency_undirected.shape[0]
+                func_rep = self._validation.function_reports.get(key)
+                z_score = func_rep.renyi_z_score if func_rep is not None else None
+                if z_score is not None and z_score > 1.0:
+                    text = (
+                        f"[STRUCTURE] Refactor {func_name}() — {n_blocks} nested blocks, "
+                        "consider extracting helper functions"
+                    )
+                    recs.append(((2, 0), text))
+                elif (z_score is not None and z_score >= 0.5) or n_blocks > 10:
+                    text = f"[MAINTAINABILITY] Simplify {func_name}() or add input validation"
+                    recs.append(((3, 0), text))
+
+        recs.sort(key=lambda x: x[0])
+        seen: set[str] = set()
+        unique_recs: list[str] = []
+        for _, text in recs:
+            if text not in seen:
+                seen.add(text)
+                unique_recs.append(text)
+                if len(unique_recs) == 3:
+                    break
+        return unique_recs
 
 
 # ---------------------------------------------------------------------------
