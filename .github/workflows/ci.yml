@@ -29,6 +29,3 @@ jobs:
 
       - name: Run unittest
         run: python -m unittest discover tests/
-
-      - name: Run pytest
-        run: pytest tests/
