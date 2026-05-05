@@ -5,10 +5,7 @@ import sys
 import unittest
 from pathlib import Path
 
-import numpy as np
-import pytest
-
-# Ensure src/ is on the path when running pytest from repo root
+# Ensure src/ is on the path when running tests from repo root
 _REPO_ROOT = Path(__file__).parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
@@ -107,5 +104,5 @@ def bar(user_input):
         import tempfile
 
         mgr = BaselineManager(baseline_dir=tempfile.mkdtemp())
-        with pytest.raises(FileNotFoundError):
+        with self.assertRaises(FileNotFoundError):
             mgr.load("nonexistent_project_xyz")
