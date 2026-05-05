@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import sys
+import unittest
 from pathlib import Path
 
 import numpy as np
@@ -52,27 +53,28 @@ def _build_snapshot(project_id: str, final_report) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def test_identical_files_yield_near_zero_drift():
-    """Two runs on the same source must produce drift_score ≈ 0 and STABLE."""
-    code = "def foo():\n    return 1\n"
-    final_a = asyncio.run(_run_full_pipeline(code))
-    final_b = asyncio.run(_run_full_pipeline(code))
+class TestDiff(unittest.TestCase):
 
-    snap_a = _build_snapshot("identical", final_a)
-    snap_b = _build_snapshot("identical", final_b)
+    def test_identical_files_yield_near_zero_drift(self):
+        """Two runs on the same source must produce drift_score ≈ 0 and STABLE."""
+        code = "def foo():\n    return 1\n"
+        final_a = asyncio.run(_run_full_pipeline(code))
+        final_b = asyncio.run(_run_full_pipeline(code))
 
-    engine = SpectralDiffEngine(snap_a, snap_b)
-    delta = engine.compute("identical")
+        snap_a = _build_snapshot("identical", final_a)
+        snap_b = _build_snapshot("identical", final_b)
 
-    assert isinstance(delta, DeltaReport)
-    assert delta.drift_score < 0.05
-    assert delta.risk_trend == "STABLE"
+        engine = SpectralDiffEngine(snap_a, snap_b)
+        delta = engine.compute("identical")
 
+        assert isinstance(delta, DeltaReport)
+        assert delta.drift_score < 0.05
+        assert delta.risk_trend == "STABLE"
 
-def test_modified_file_shows_significant_drift():
-    """Adding loops, functions, and security sinks must elevate drift_score above 0.2."""
-    baseline_code = "def foo():\n    return 1\n"
-    modified_code = '''
+    def test_modified_file_shows_significant_drift(self):
+        """Adding loops, functions, and security sinks must elevate drift_score above 0.2."""
+        baseline_code = "def foo():\n    return 1\n"
+        modified_code = '''
 def foo():
     x = 0
     for i in range(10):
@@ -86,25 +88,24 @@ def bar(user_input):
     os.system(user_input)
     return user_input
 '''
-    final_base = asyncio.run(_run_full_pipeline(baseline_code))
-    final_mod = asyncio.run(_run_full_pipeline(modified_code))
+        final_base = asyncio.run(_run_full_pipeline(baseline_code))
+        final_mod = asyncio.run(_run_full_pipeline(modified_code))
 
-    snap_base = _build_snapshot("modified", final_base)
-    snap_mod = _build_snapshot("modified", final_mod)
+        snap_base = _build_snapshot("modified", final_base)
+        snap_mod = _build_snapshot("modified", final_mod)
 
-    engine = SpectralDiffEngine(snap_base, snap_mod)
-    delta = engine.compute("modified")
+        engine = SpectralDiffEngine(snap_base, snap_mod)
+        delta = engine.compute("modified")
 
-    assert isinstance(delta, DeltaReport)
-    assert delta.drift_score > 0.2
-    assert delta.risk_trend in ("DEGRADED", "FRACTURED")
-    assert len(delta.function_changes) > 0
+        assert isinstance(delta, DeltaReport)
+        assert delta.drift_score > 0.2
+        assert delta.risk_trend in ("DEGRADED", "FRACTURED")
+        assert len(delta.function_changes) > 0
 
+    def test_missing_baseline_raises_file_not_found(self):
+        """Loading a non-existent baseline must raise FileNotFoundError."""
+        import tempfile
 
-def test_missing_baseline_raises_file_not_found():
-    """Loading a non-existent baseline must raise FileNotFoundError."""
-    import tempfile
-
-    mgr = BaselineManager(baseline_dir=tempfile.mkdtemp())
-    with pytest.raises(FileNotFoundError):
-        mgr.load("nonexistent_project_xyz")
+        mgr = BaselineManager(baseline_dir=tempfile.mkdtemp())
+        with pytest.raises(FileNotFoundError):
+            mgr.load("nonexistent_project_xyz")
