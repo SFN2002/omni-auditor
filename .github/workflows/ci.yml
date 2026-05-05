@@ -30,7 +30,5 @@ jobs:
       - name: Run unittest
         run: python -m unittest discover tests/
 
-      - name: Run pytest (if available)
-        run: |
-          pip install pytest
-          pytest tests/
+      - name: Run pytest
+        run: pytest tests/
