@@ -1,0 +1,56 @@
+{
+  "name": "omni-auditor",
+  "displayName": "Omni-Auditor",
+  "version": "0.1.0",
+  "description": "VS Code extension for Omni-Auditor spectral Python analysis",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:python",
+    "workspaceContains:**/*.py"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "omni-auditor.scanFile",
+        "title": "Scan File",
+        "category": "Omni-Auditor"
+      },
+      {
+        "command": "omni-auditor.scanWorkspace",
+        "title": "Scan Workspace",
+        "category": "Omni-Auditor"
+      }
+    ],
+    "configuration": {
+      "title": "Omni-Auditor",
+      "properties": {
+        "omniAuditor.cliPath": {
+          "type": "string",
+          "default": "C:\\smart-auditor\\venv\\Scripts\\omni-auditor.exe",
+          "description": "Path to the omni-auditor CLI executable"
+        },
+        "omniAuditor.runOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run Omni-Auditor analysis on file save"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.74.0",
+    "@types/node": "^18.0.0",
+    "typescript": "^5.0.0"
+  }
+}

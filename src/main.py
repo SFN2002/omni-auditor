@@ -40,6 +40,7 @@ import bisect
 import contextlib
 import dataclasses
 import json
+import logging
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -78,6 +79,8 @@ except ImportError:  # pragma: no cover
     from engine.diff import SpectralDiffEngine, DeltaReport
     from reporting.json_exporter import JSONExporter
 
+logger = logging.getLogger("omni_auditor")
+
 
 # ---------------------------------------------------------------------------
 # Data classes
@@ -112,8 +115,9 @@ class AnalysisPipeline:
         Validator(analysis_result)
     """
 
-    def __init__(self, source_code: str) -> None:
+    def __init__(self, source_code: str, anomaly_threshold: float = 1.5) -> None:
         self.source_code: str = source_code
+        self.anomaly_threshold: float = anomaly_threshold
 
     # -- internal CPU-bound runners ----------------------------------------
 
@@ -121,7 +125,7 @@ class AnalysisPipeline:
         return Analyzer(self.source_code).analyze()
 
     def _run_validator(self, analysis: StructuralAnalysisResult) -> ValidationResult:
-        return StatisticalValidator(analysis).validate()
+        return StatisticalValidator(analysis, anomaly_threshold=self.anomaly_threshold).validate()
 
     def _run_security(self) -> SecurityReport:
         return SafetyGuard(self.source_code).scan()
@@ -251,9 +255,10 @@ class RichUIRenderer:
     *   Footer panel (unified risk score, colour-coded)
     """
 
-    def __init__(self, file_path: str | None = None) -> None:
+    def __init__(self, file_path: str | None = None, anomaly_threshold: float = 1.5) -> None:
         self.console = Console()
         self.file_path = file_path
+        self._anomaly_threshold: float = anomaly_threshold
 
         self.progress = Progress(
             SpinnerColumn(),
@@ -338,6 +343,8 @@ class RichUIRenderer:
 
     def set_validation_result(self, result: ValidationResult) -> None:
         self._validation = result
+        if hasattr(result, "anomaly_threshold"):
+            self._anomaly_threshold = result.anomaly_threshold
         self._render_functions_table()
 
     def set_security_result(self, result: SecurityReport) -> None:
@@ -547,7 +554,7 @@ class RichUIRenderer:
             return Text("🔴 Security Critical", style="bold red")
         if sum(sev_counts.values()) > 0:
             return Text("⚠️ Fractured", style="bold yellow")
-        if z_score is not None and z_score > 1.0 and n_blocks > 10:
+        if z_score is not None and z_score > self._anomaly_threshold and n_blocks > 10:
             return Text("🔴 Critical", style="bold red")
         if (z_score is not None and z_score >= 0.5) or n_blocks > 10:
             return Text("🟡 Warning", style="bold yellow")
@@ -653,14 +660,15 @@ class OmniAuditor:
         file_path: str | None = None,
         no_ui: bool = False,
         critical_threshold: float = 0.7,
+        anomaly_threshold: float = 1.5,
     ) -> None:
         self.source_code: str = source_code
         self.file_path: str | None = file_path
         self.no_ui: bool = no_ui
         self.critical_threshold: float = critical_threshold
-        self.pipeline = AnalysisPipeline(source_code)
+        self.pipeline = AnalysisPipeline(source_code, anomaly_threshold=anomaly_threshold)
         if not no_ui:
-            self.renderer = RichUIRenderer(file_path=file_path)
+            self.renderer = RichUIRenderer(file_path=file_path, anomaly_threshold=anomaly_threshold)
 
     async def _run_pipeline(self) -> FinalReport:
         """Execute analysis without any UI side effects."""
@@ -721,23 +729,22 @@ class OmniAuditor:
 
 def _print_verbose_metrics(report: FinalReport) -> None:
     """Print detailed per-function spectral metrics to stdout."""
-    print("\n=== Detailed Per-Function Spectral Metrics ===\n")
+    logger.info("=== Detailed Per-Function Spectral Metrics ===")
     for key, profile in report.analysis.function_spectrals.items():
-        print(f"Function: {key}")
-        print(f"  Laplacian shape : {profile.laplacian_combinatorial.shape}")
-        print(f"  Fiedler value   : {profile.fiedler_value:.4f}")
-        print(f"  Spectral radius : {profile.spectral_radius:.4f}")
-        print(f"  Spectral gap    : {profile.spectral_gap:.4f}")
+        logger.info("Function: %s", key)
+        logger.info("  Laplacian shape : %s", profile.laplacian_combinatorial.shape)
+        logger.info("  Fiedler value   : %.4f", profile.fiedler_value)
+        logger.info("  Spectral radius : %.4f", profile.spectral_radius)
+        logger.info("  Spectral gap    : %.4f", profile.spectral_gap)
         eig_vals = profile.eigenvalues_combinatorial
         if len(eig_vals) > 6:
-            print(
-                f"  Eigenvalues     : "
-                f"[{eig_vals[0]:.4f}, {eig_vals[1]:.4f}, ..., {eig_vals[-1]:.4f}] "
-                f"(n={len(eig_vals)})"
+            logger.info(
+                "  Eigenvalues     : "
+                "[%.4f, %.4f, ..., %.4f] (n=%d)",
+                eig_vals[0], eig_vals[1], eig_vals[-1], len(eig_vals),
             )
         else:
-            print(f"  Eigenvalues     : {[float(v) for v in eig_vals]}")
-        print()
+            logger.info("  Eigenvalues     : %s", [float(v) for v in eig_vals])
 
 
 def _print_delta_report(delta: DeltaReport) -> None:
@@ -864,6 +871,12 @@ def main() -> None:
         default=None,
         help="Load a saved baseline and compute structural drift against the current file.",
     )
+    parser.add_argument(
+        "--anomaly-threshold",
+        type=float,
+        default=1.5,
+        help="Z-score threshold for flagging structural anomalies (default: 1.5).",
+    )
     args = parser.parse_args()
 
     source_path = Path(args.file)
@@ -874,6 +887,7 @@ def main() -> None:
     try:
         source_code = source_path.read_text(encoding="utf-8")
     except Exception as exc:  # pragma: no cover
+        logger.error("Error reading file: %s", exc)
         Console(stderr=True).print(f"[red]Error reading file:[/red] {exc}")
         sys.exit(1)
 
@@ -882,10 +896,12 @@ def main() -> None:
         file_path=str(source_path.resolve()),
         no_ui=args.json,
         critical_threshold=args.threshold,
+        anomaly_threshold=args.anomaly_threshold,
     )
     try:
         final_report = asyncio.run(auditor.run())
     except Exception as exc:  # pragma: no cover
+        logger.error("Analysis failed: %s", exc)
         Console(stderr=True).print(f"[red]Analysis failed:[/red] {exc}")
         sys.exit(1)
 
@@ -914,6 +930,7 @@ def main() -> None:
         try:
             baseline_data = baseline_mgr.load(args.diff)
         except FileNotFoundError as exc:
+            logger.error("Baseline not found: %s", exc)
             Console(stderr=True).print(f"[red]Error:[/red] {exc}")
             sys.exit(1)
 

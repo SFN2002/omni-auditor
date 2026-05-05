@@ -98,6 +98,7 @@ class ValidationResult:
     population_keys: list[str]
     covariance_matrix: NDArray[np.float64]
     precision_matrix: NDArray[np.float64]
+    anomaly_threshold: float = 1.5
 
 
 # ---------------------------------------------------------------------------
@@ -336,8 +337,9 @@ class StatisticalValidator:
     3.  A fused anomaly score via ``AnomalyScorer``.
     """
 
-    def __init__(self, analysis: StructuralAnalysisResult) -> None:
+    def __init__(self, analysis: StructuralAnalysisResult, anomaly_threshold: float = 1.5) -> None:
         self.analysis: StructuralAnalysisResult = analysis
+        self.anomaly_threshold: float = anomaly_threshold
         self._population_keys: list[str] = []
         self._population_matrix: NDArray[np.float64] = np.zeros((0, 0))
         self._build_population()
@@ -509,6 +511,7 @@ class StatisticalValidator:
             population_keys=list(self._population_keys),
             covariance_matrix=cov_est.regularized_covariance.copy(),
             precision_matrix=cov_est.precision.copy(),
+            anomaly_threshold=self.anomaly_threshold,
         )
 
 
