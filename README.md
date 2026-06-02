@@ -1,12 +1,20 @@
 # Omni-Auditor
 
-> Research-grade static analysis engine combining Spectral Graph Theory, Rényi Entropy, and Mahalanobis Distance to detect deep structural fragility in code.
+> Research-grade static analysis engine combining Spectral Graph Theory, Rényi Entropy, and Mahalanobis Distance to detect deep structural fragility in Python code.
 
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 ![Code style: strict typing](https://img.shields.io/badge/code%20style-strict%20typing-blue)
 ![PyPI](https://img.shields.io/pypi/v/omni-auditor)
 ![CI](https://github.com/omni-auditor/omni-auditor/actions/workflows/ci.yml/badge.svg)
+
+---
+
+## Overview
+
+Omni-Auditor is a research-grade static analysis engine for Python that goes beyond traditional linting. It converts your code's control flow into spectral graph representations, applies multivariate statistical anomaly detection, and scans for security vulnerabilities — fusing all signals into a single unified risk score.
+
+Built for **security engineers**, **Python developers**, and **DevSecOps teams** who need rigorous, quantitative insight into code health and security posture.
 
 ---
 
@@ -17,6 +25,16 @@ pip install omni-auditor
 ```
 
 Requirements: Python ≥3.10, `numpy`, `scipy`, `rich`.
+
+For the GitHub App server:
+```bash
+pip install -r github-app/requirements.txt
+```
+
+For VS Code extension development:
+```bash
+cd vscode-extension && npm install
+```
 
 ---
 
@@ -32,6 +50,18 @@ Emit a compact JSON report:
 
 ```bash
 python -m src.main test_sample.py --json
+```
+
+Save a spectral baseline for drift detection:
+
+```bash
+python -m src.main test_sample.py --save-baseline my-project
+```
+
+Compare against a saved baseline:
+
+```bash
+python -m src.main test_sample.py --diff my-project
 ```
 
 ---
@@ -61,6 +91,58 @@ The **FusionEngine** adaptively weights the three vectors (56-D + 16-D + 18-D = 
 | `--threshold FLOAT` | Override the CRITICAL risk tier threshold (default: `0.7`). |
 | `--save-baseline ID` | Persist the current analysis snapshot as a baseline under the given project ID. |
 | `--diff ID` | Load a saved baseline and compute structural drift against the current file. |
+| `--anomaly-threshold FLOAT` | Z-score threshold for flagging structural anomalies (default: `1.5`). |
+
+---
+
+## VS Code Extension
+
+Omni-Auditor includes a full VS Code extension for inline analysis.
+
+### Features
+- **Inline diagnostics** — Severity-mapped diagnostics in the Problems panel
+- **Hover providers** — Module-level and per-function risk metrics on hover
+- **Gutter decorations** — Colour-coded severity dots and background highlighting
+- **Risk Dashboard** — Webview panel with Chart.js gauges, fusion weights, and findings table
+- **Auto-analyse on save** — Optional background analysis every time you save a Python file
+
+### Install
+```bash
+cd vscode-extension && npm run compile
+```
+
+### Settings
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `omniAuditor.pythonPath` | `python` | Path to the Python 3.10+ executable |
+| `omniAuditor.projectRoot` | `""` | Absolute path to the Omni-Auditor project root |
+| `omniAuditor.threshold` | `0.7` | CRITICAL risk tier threshold |
+| `omniAuditor.autoAnalyzeOnSave` | `true` | Run analysis on every save |
+
+---
+
+## GitHub App
+
+The GitHub App provides automated PR analysis with webhook-driven architecture.
+
+### Features
+- **Webhook handler** — FastAPI server listening for `pull_request` events
+- **Changed-file discovery** — Automatically analyses only modified `.py` files
+- **PR comment upserts** — Markdown summary with risk scores and drift indicators
+- **Async I/O** — All PyGithub network calls run in thread pools to avoid blocking
+
+### Run locally
+```bash
+uvicorn github-app.main:app --host 0.0.0.0 --port 8000
+```
+
+### Environment variables
+| Variable | Description |
+|----------|-------------|
+| `OMNI_AUDITOR_APP_ID` | GitHub App ID |
+| `OMNI_AUDITOR_PRIVATE_KEY` | Path to PEM file or raw PEM string |
+| `OMNI_AUDITOR_WEBHOOK_SECRET` | HMAC-SHA256 webhook secret |
+| `OMNI_AUDITOR_THRESHOLD` | Risk tier threshold (default: `0.7`) |
 
 ---
 
@@ -149,23 +231,52 @@ omni-auditor/
 │   │   ├── security.py            # Vulnerability scanners
 │   │   ├── diff.py                # Spectral drift / baseline comparison
 │   │   └── baseline.py            # Baseline persistence & snapshot builder
-│   └── reporting/
-│       └── json_exporter.py       # JSON serialization helper
-├── tests/
-│   └── test_diff.py               # pytest suite for diff engine & pipeline
-├── requirements.txt               # numpy, scipy, rich
-├── test_sample.py                 # Demo file with intentional security sinks
-└── .omni_cache/                   # Pickle cache & JSON baselines
+│   ├── reporting/
+│   │   └── json_exporter.py       # JSON serialization helper
+│   └── sarif_exporter.py          # SARIF v2.1.0 generator
+├── github-app/
+│   ├── main.py                    # FastAPI webhook handler
+│   ├── analyzer.py                # PR file fetcher & subprocess runner
+│   ├── commenter.py               # Markdown PR comment builder
+│   ├── baseline.py                # Drift computation for PRs
+│   ├── config.py                  # Pydantic settings
+│   └── tests/                     # GitHub App unit tests
+├── vscode-extension/
+│   ├── src/
+│   │   ├── extension.ts           # Extension entry point
+│   │   ├── providers/
+│   │   │   ├── diagnostics.ts     # Problem panel integration
+│   │   │   ├── hoverProvider.ts   # Hover tooltips
+│   │   │   └── decorationProvider.ts  # Gutter icons & highlights
+│   │   ├── commands/
+│   │   │   └── runAnalysis.ts     # Analysis command
+│   │   ├── panels/
+│   │   │   └── riskDashboard.ts   # Chart.js webview
+│   │   └── utils/
+│   │       └── apiClient.ts       # Python CLI wrapper
+│   └── package.json
+├── tests/                         # Core engine & orchestrator tests
+├── .github/workflows/ci.yml       # Matrix CI (Windows/Ubuntu × Python 3.10/3.11/3.12)
+├── action.yml                     # Composite GitHub Action
+├── pyproject.toml
+└── README.md
 ```
 
 ---
 
-## Roadmap
+## Development
 
-- [ ] **Multi-language support** — Extend AST parsing to JavaScript / TypeScript via tree-sitter.
-- [ ] **VS Code Extension** — Inline risk annotations and spectral metrics in the editor.
-- [ ] **GitHub App** — Automated PR comments with drift reports and security findings.
-- [ ] **SaaS Dashboard** — Historical trend visualisation for team-wide code health.
+```bash
+# Run all tests
+python -m unittest discover tests/ -v
+python -m unittest discover github-app/tests/ -v
+
+# Compile VS Code extension
+cd vscode-extension && npm run compile
+
+# Package extension
+cd vscode-extension && vsce package
+```
 
 ---
 
