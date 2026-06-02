@@ -3,11 +3,33 @@
   "displayName": "Omni-Auditor",
   "version": "0.1.0",
   "description": "VS Code extension for Omni-Auditor spectral Python analysis",
+  "publisher": "omni-auditor",
+  "license": "MIT",
+  "icon": "images/icon.png",
+  "galleryBanner": {
+    "color": "#1e1e1e",
+    "theme": "dark"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/omni-auditor/omni-auditor"
+  },
+  "bugs": {
+    "url": "https://github.com/omni-auditor/omni-auditor/issues"
+  },
+  "homepage": "https://github.com/omni-auditor/omni-auditor#readme",
   "engines": {
     "vscode": "^1.74.0"
   },
   "categories": [
-    "Other"
+    "Linters",
+    "Debuggers"
+  ],
+  "keywords": [
+    "python",
+    "security",
+    "static-analysis",
+    "spectral-graph"
   ],
   "activationEvents": [
     "onLanguage:python",
@@ -17,28 +39,61 @@
   "contributes": {
     "commands": [
       {
-        "command": "omni-auditor.scanFile",
-        "title": "Scan File",
-        "category": "Omni-Auditor"
+        "command": "omni-auditor.analyzeCurrentFile",
+        "title": "Analyze Current File",
+        "category": "Omni-Auditor",
+        "icon": "$(shield)"
       },
       {
-        "command": "omni-auditor.scanWorkspace",
-        "title": "Scan Workspace",
-        "category": "Omni-Auditor"
+        "command": "omni-auditor.showRiskDashboard",
+        "title": "Show Risk Dashboard",
+        "category": "Omni-Auditor",
+        "icon": "$(graph)"
       }
     ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "omni-auditor.analyzeCurrentFile",
+          "when": "editorLangId == python",
+          "group": "navigation@1"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "omni-auditor.analyzeCurrentFile",
+          "when": "editorLangId == python"
+        },
+        {
+          "command": "omni-auditor.showRiskDashboard",
+          "when": "editorLangId == python"
+        }
+      ]
+    },
     "configuration": {
       "title": "Omni-Auditor",
       "properties": {
-        "omniAuditor.cliPath": {
+        "omniAuditor.pythonPath": {
           "type": "string",
-          "default": "C:\\smart-auditor\\venv\\Scripts\\omni-auditor.exe",
-          "description": "Path to the omni-auditor CLI executable"
+          "default": "python",
+          "description": "Path to the Python 3.10+ executable"
         },
-        "omniAuditor.runOnSave": {
+        "omniAuditor.projectRoot": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute path to the Omni-Auditor project root (directory containing src/main.py)"
+        },
+        "omniAuditor.threshold": {
+          "type": "number",
+          "default": 0.7,
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "CRITICAL risk tier threshold forwarded to --threshold"
+        },
+        "omniAuditor.autoAnalyzeOnSave": {
           "type": "boolean",
           "default": true,
-          "description": "Run Omni-Auditor analysis on file save"
+          "description": "Automatically run Omni-Auditor analysis when saving a Python file"
         }
       }
     }

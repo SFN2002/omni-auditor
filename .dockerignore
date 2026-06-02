@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.git/
+.omni_cache/
+output.json
+tests/benchmarks/dataset/downloaded/
+vscode-extension/out/
+node_modules/
+*.vsix

@@ -306,7 +306,10 @@ class PathTraversalScanner:
         "os.path.join",
         "shutil.copy", "shutil.copy2", "shutil.copyfile",
         "shutil.copytree", "shutil.move",
-        "pathlib.Path",
+    })
+
+    _PATHLIB_IO_ATTRS: frozenset[str] = frozenset({
+        "read_text", "write_text", "read_bytes", "write_bytes", "open",
     })
 
     def scan(self, tree: ast.AST, source_lines: list[str]) -> list[ThreatSignature]:
@@ -337,6 +340,28 @@ class PathTraversalScanner:
                                 confidence_score=confidence,
                             )
                         )
+
+            # Detect pathlib.Path(...).read_text() / .write_text() / .open() chains
+            if isinstance(node.func, ast.Attribute) and node.func.attr in PathTraversalScanner._PATHLIB_IO_ATTRS:
+                inner = node.func.value
+                if isinstance(inner, ast.Call):
+                    inner_name = _resolve_attribute(inner.func)
+                    if inner_name in ("pathlib.Path", "Path") and inner.args:
+                        arg = inner.args[0]
+                        is_literal = _is_string_literal(arg)
+                        has_user_input = _contains_user_input(arg)
+                        if not is_literal or has_user_input:
+                            confidence = 0.78 if has_user_input else 0.62
+                            self.threats.append(
+                                ThreatSignature(
+                                    severity="MEDIUM",
+                                    category="path_traversal",
+                                    line_number=getattr(node, "lineno", 0),
+                                    node_path=f"{inner_name}.{node.func.attr}",
+                                    confidence_score=confidence,
+                                )
+                            )
+
             self.generic_visit(node)
 
 
@@ -556,6 +581,15 @@ class VulnerabilityScanner:
         threats: list[ThreatSignature] = []
         for scanner in self._scanners:
             threats.extend(scanner.scan(tree, source_lines))
+        # Deduplicate by (line_number, node_path), keeping the highest severity.
+        severity_order = {"CRITICAL": 4, "HIGH": 3, "MEDIUM": 2, "LOW": 1}
+        deduped: dict[tuple[int, str], ThreatSignature] = {}
+        for t in threats:
+            key = (t.line_number, t.node_path)
+            existing = deduped.get(key)
+            if existing is None or severity_order[t.severity] > severity_order[existing.severity]:
+                deduped[key] = t
+        threats = list(deduped.values())
         # Deterministic ordering by line number for stable downstream vectors.
         threats.sort(key=lambda t: (t.line_number, t.category, t.node_path))
         return threats

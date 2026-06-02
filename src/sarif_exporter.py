@@ -147,7 +147,7 @@ def export_sarif(
                     "driver": {
                         "name": _TOOL_NAME,
                         "version": _TOOL_VERSION,
-                        "informationUri": "https://github.com/SFN2002/omni-auditor",
+                        "informationUri": "https://github.com/omni-auditor/omni-auditor",
                     }
                 },
                 "results": results,

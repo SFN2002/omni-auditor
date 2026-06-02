@@ -37,7 +37,8 @@ from __future__ import annotations
 import ast
 import enum
 import hashlib
-import pickle
+import json
+import logging
 import shutil
 import uuid
 import warnings
@@ -51,6 +52,8 @@ from scipy.linalg import eigh
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import dijkstra
 from scipy.sparse.linalg import eigsh
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -917,8 +920,11 @@ class CacheManager:
     """Disk-based cache for :class:`StructuralAnalysisResult` objects.
 
     Cache keys are SHA256 hex digests of the source code string.
-    Objects are persisted via :mod:`pickle` so that NumPy arrays are
-    preserved faithfully.
+    Objects are persisted as:
+      * ``.npz`` — NumPy arrays (compressed, safe)
+      * ``.json`` — metadata (block types, edges, scalars)
+    Old ``.pkl`` files are detected, warned about, and skipped.
+    An SHA256 integrity check guards against tampering or corruption.
     """
 
     def __init__(self, cache_dir: str | Path = ".omni_cache") -> None:
@@ -928,26 +934,249 @@ class CacheManager:
     def _ensure_dir(self) -> None:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
-    def _key_to_path(self, key: str) -> Path:
+    def _key_to_npz(self, key: str) -> Path:
+        return self.cache_dir / f"{key}.npz"
+
+    def _key_to_json(self, key: str) -> Path:
+        return self.cache_dir / f"{key}.json"
+
+    def _key_to_pkl(self, key: str) -> Path:
         return self.cache_dir / f"{key}.pkl"
+
+    def _compute_checksum(self, path: Path) -> str:
+        """Return SHA256 hex digest over the file contents."""
+        h = hashlib.sha256()
+        with open(path, "rb") as f:
+            while True:
+                chunk = f.read(8192)
+                if not chunk:
+                    break
+                h.update(chunk)
+        return h.hexdigest()
+
+    # -- helpers to serialise / deserialise CFGs -----------------------------
+
+    @staticmethod
+    def _block_to_dict(block: BasicBlock) -> dict[str, Any]:
+        return {
+            "uid": block.uid,
+            "block_type": int(block.block_type),
+            "statement_count": block.statement_count,
+            "predecessors": list(block.predecessors),
+            "successors": list(block.successors),
+        }
+
+    @staticmethod
+    def _dict_to_block(d: dict[str, Any]) -> BasicBlock:
+        block = BasicBlock(
+            uid=d["uid"],
+            block_type=BlockType(d["block_type"]),
+        )
+        block.predecessors = set(d.get("predecessors", []))
+        block.successors = set(d.get("successors", []))
+        # Statements are opaque AST nodes — we store only counts; the
+        # CFG structure (edges, block types) is what the cache needs.
+        for _ in range(d.get("statement_count", 0)):
+            block.add_statement(ast.Pass())
+        return block
+
+    @staticmethod
+    def _cfg_to_dict(cfg: ControlFlowGraph) -> dict[str, Any]:
+        return {
+            "name": cfg.name,
+            "blocks": {
+                uid: CacheManager._block_to_dict(b)
+                for uid, b in cfg.blocks.items()
+            },
+            "entry_uid": cfg.entry_block.uid,
+            "exit_uid": cfg.exit_block.uid,
+            "edges": list(cfg.edge_list),
+        }
+
+    @staticmethod
+    def _dict_to_cfg(d: dict[str, Any]) -> ControlFlowGraph:
+        cfg = ControlFlowGraph(name=d.get("name", "<unnamed>"))
+        # Clear auto-created entry/exit so we can recreate exactly.
+        cfg._blocks.clear()
+        cfg._edges.clear()
+        for uid, bd in d["blocks"].items():
+            block = CacheManager._dict_to_block(bd)
+            cfg._blocks[block.uid] = block
+        cfg._entry = cfg._blocks[d["entry_uid"]]
+        cfg._exit = cfg._blocks[d["exit_uid"]]
+        for s_id, t_id in d.get("edges", []):
+            cfg._blocks[s_id].successors.add(t_id)
+            cfg._blocks[t_id].predecessors.add(s_id)
+            cfg._edges.add((s_id, t_id))
+        return cfg
+
+    @staticmethod
+    def _spectral_to_arrays(profile: SpectralProfile) -> dict[str, NDArray[np.float64]]:
+        return {
+            "adjacency_directed": profile.adjacency_directed,
+            "adjacency_undirected": profile.adjacency_undirected,
+            "degree_matrix": profile.degree_matrix,
+            "laplacian_combinatorial": profile.laplacian_combinatorial,
+            "laplacian_normalized": profile.laplacian_normalized,
+            "laplacian_random_walk": profile.laplacian_random_walk,
+            "eigenvalues_combinatorial": profile.eigenvalues_combinatorial,
+            "eigenvalues_normalized": profile.eigenvalues_normalized,
+            "eigenvectors_combinatorial": profile.eigenvectors_combinatorial,
+            "feature_vector": profile.feature_vector,
+        }
+
+    @staticmethod
+    def _spectral_from_arrays(data: dict[str, NDArray[np.float64]]) -> SpectralProfile:
+        return SpectralProfile(
+            adjacency_directed=data["adjacency_directed"],
+            adjacency_undirected=data["adjacency_undirected"],
+            degree_matrix=data["degree_matrix"],
+            laplacian_combinatorial=data["laplacian_combinatorial"],
+            laplacian_normalized=data["laplacian_normalized"],
+            laplacian_random_walk=data["laplacian_random_walk"],
+            eigenvalues_combinatorial=data["eigenvalues_combinatorial"],
+            eigenvalues_normalized=data["eigenvalues_normalized"],
+            eigenvectors_combinatorial=data["eigenvectors_combinatorial"],
+            feature_vector=data["feature_vector"],
+            fiedler_value=float(data["feature_vector"][2]),
+            spectral_gap=float(data["feature_vector"][3]),
+            algebraic_connectivity=float(data["feature_vector"][4]),
+            spectral_radius=float(data["feature_vector"][5]),
+            von_neumann_entropy=float(data["feature_vector"][6]),
+            renyi_entropy_2=float(data["feature_vector"][7]),
+            graph_energy=float(data["feature_vector"][8]),
+            modularity_index=float(data["feature_vector"][9]),
+            effective_rank=float(data["feature_vector"][10]),
+            normalized_fiedler=float(data["feature_vector"][11]),
+            eigengap_ratio=float(data["feature_vector"][12]),
+            spectral_discrepancy=float(data["feature_vector"][13]),
+        )
+
+    # -- public API ----------------------------------------------------------
 
     def get(self, key: str) -> StructuralAnalysisResult | None:
         """Load a cached result by *key*, or ``None`` on miss / corruption."""
-        path = self._key_to_path(key)
-        if not path.exists():
+        npz_path = self._key_to_npz(key)
+        json_path = self._key_to_json(key)
+        pkl_path = self._key_to_pkl(key)
+
+        if pkl_path.exists():
+            logger.warning(
+                "Deprecated pickle cache found for key %s. "
+                "It will be ignored and regenerated. "
+                "Remove %s to suppress this warning.",
+                key,
+                pkl_path,
+            )
             return None
+
+        if not npz_path.exists() or not json_path.exists():
+            return None
+
         try:
-            with open(path, "rb") as f:
-                return pickle.load(f)
+            with open(json_path, "r", encoding="utf-8") as f:
+                meta = json.load(f)
         except Exception:
             return None
+
+        # Integrity check (NPZ payload only — JSON is metadata)
+        expected_checksum = meta.get("checksum")
+        if expected_checksum is None:
+            return None
+        actual_checksum = self._compute_checksum(npz_path)
+        if actual_checksum != expected_checksum:
+            logger.warning(
+                "Cache integrity check failed for key %s. "
+                "Expected %s, got %s. Cache entry discarded.",
+                key,
+                expected_checksum,
+                actual_checksum,
+            )
+            return None
+
+        try:
+            raw = np.load(npz_path, allow_pickle=False)
+        except Exception:
+            return None
+
+        try:
+            module_spectral = self._spectral_from_arrays(
+                {k: raw[f"module_spectral.{k}"] for k in self._spectral_to_arrays(SpectralProfile(
+                    adjacency_directed=np.zeros((1,1)), adjacency_undirected=np.zeros((1,1)),
+                    degree_matrix=np.zeros((1,1)), laplacian_combinatorial=np.zeros((1,1)),
+                    laplacian_normalized=np.zeros((1,1)), laplacian_random_walk=np.zeros((1,1)),
+                    eigenvalues_combinatorial=np.zeros(1), eigenvalues_normalized=np.zeros(1),
+                    eigenvectors_combinatorial=np.zeros((1,1)), feature_vector=np.zeros(14),
+                    fiedler_value=0.0, spectral_gap=0.0, algebraic_connectivity=0.0,
+                    spectral_radius=0.0, von_neumann_entropy=0.0, renyi_entropy_2=0.0,
+                    graph_energy=0.0, modularity_index=0.0, effective_rank=0.0,
+                    normalized_fiedler=0.0, eigengap_ratio=0.0, spectral_discrepancy=0.0,
+                )).keys()}
+            )
+            function_spectrals: dict[str, SpectralProfile] = {}
+            for func_key in meta["function_keys"]:
+                function_spectrals[func_key] = self._spectral_from_arrays(
+                    {k: raw[f"function_spectrals.{func_key}.{k}"] for k in self._spectral_to_arrays(SpectralProfile(
+                        adjacency_directed=np.zeros((1,1)), adjacency_undirected=np.zeros((1,1)),
+                        degree_matrix=np.zeros((1,1)), laplacian_combinatorial=np.zeros((1,1)),
+                        laplacian_normalized=np.zeros((1,1)), laplacian_random_walk=np.zeros((1,1)),
+                        eigenvalues_combinatorial=np.zeros(1), eigenvalues_normalized=np.zeros(1),
+                        eigenvectors_combinatorial=np.zeros((1,1)), feature_vector=np.zeros(14),
+                        fiedler_value=0.0, spectral_gap=0.0, algebraic_connectivity=0.0,
+                        spectral_radius=0.0, von_neumann_entropy=0.0, renyi_entropy_2=0.0,
+                        graph_energy=0.0, modularity_index=0.0, effective_rank=0.0,
+                        normalized_fiedler=0.0, eigengap_ratio=0.0, spectral_discrepancy=0.0,
+                    )).keys()}
+                )
+            module_cfg = self._dict_to_cfg(meta["module_cfg"])
+            function_cfgs = {
+                k: self._dict_to_cfg(v) for k, v in meta["function_cfgs"].items()
+            }
+            aggregate_feature_vector = raw["aggregate_feature_vector"]
+            node_feature_matrix = raw["node_feature_matrix"]
+            node_index_map = {k: int(v) for k, v in meta["node_index_map"].items()}
+        except Exception:
+            return None
+
+        return StructuralAnalysisResult(
+            module_cfg=module_cfg,
+            function_cfgs=function_cfgs,
+            module_spectral=module_spectral,
+            function_spectrals=function_spectrals,
+            aggregate_feature_vector=aggregate_feature_vector,
+            node_feature_matrix=node_feature_matrix,
+            node_index_map=node_index_map,
+        )
 
     def set(self, key: str, result: StructuralAnalysisResult) -> None:
         """Persist *result* under *key*."""
         self._ensure_dir()
-        path = self._key_to_path(key)
-        with open(path, "wb") as f:
-            pickle.dump(result, f)
+        npz_path = self._key_to_npz(key)
+        json_path = self._key_to_json(key)
+
+        arrays: dict[str, NDArray[np.float64]] = {}
+        for k, arr in self._spectral_to_arrays(result.module_spectral).items():
+            arrays[f"module_spectral.{k}"] = arr
+        for func_key, profile in result.function_spectrals.items():
+            for k, arr in self._spectral_to_arrays(profile).items():
+                arrays[f"function_spectrals.{func_key}.{k}"] = arr
+        arrays["aggregate_feature_vector"] = result.aggregate_feature_vector
+        arrays["node_feature_matrix"] = result.node_feature_matrix
+
+        np.savez_compressed(npz_path, **arrays)
+
+        meta = {
+            "module_cfg": self._cfg_to_dict(result.module_cfg),
+            "function_cfgs": {
+                k: self._cfg_to_dict(v) for k, v in result.function_cfgs.items()
+            },
+            "function_keys": list(result.function_spectrals.keys()),
+            "node_index_map": result.node_index_map,
+            "checksum": self._compute_checksum(npz_path),
+        }
+
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(meta, f, indent=2, ensure_ascii=False)
 
     def clear(self) -> None:
         """Remove the entire cache directory and its contents."""

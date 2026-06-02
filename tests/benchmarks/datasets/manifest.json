@@ -1,0 +1,142 @@
+[
+  {
+    "repo": "django/django",
+    "stars": 87411,
+    "file_count": 100,
+    "total_lines": 3748,
+    "status": "ok"
+  },
+  {
+    "repo": "fastapi/fastapi",
+    "stars": 97929,
+    "file_count": 100,
+    "total_lines": 1571,
+    "status": "ok"
+  },
+  {
+    "repo": "urllib3/urllib3",
+    "stars": 4020,
+    "file_count": 42,
+    "total_lines": 12781,
+    "status": "ok"
+  },
+  {
+    "repo": "requests/requests",
+    "stars": 53965,
+    "file_count": 19,
+    "total_lines": 5511,
+    "status": "ok"
+  },
+  {
+    "repo": "flask/flask",
+    "stars": 0,
+    "file_count": 0,
+    "total_lines": 0,
+    "status": "skipped"
+  },
+  {
+    "repo": "scrapy/scrapy",
+    "stars": 61561,
+    "file_count": 100,
+    "total_lines": 16917,
+    "status": "ok"
+  },
+  {
+    "repo": "celery/celery",
+    "stars": 28433,
+    "file_count": 100,
+    "total_lines": 25256,
+    "status": "ok"
+  },
+  {
+    "repo": "sqlalchemy/sqlalchemy",
+    "stars": 11826,
+    "file_count": 100,
+    "total_lines": 40562,
+    "status": "ok"
+  },
+  {
+    "repo": "pytest-dev/pytest",
+    "stars": 13827,
+    "file_count": 100,
+    "total_lines": 31541,
+    "status": "ok"
+  },
+  {
+    "repo": "aio-libs/aiohttp",
+    "stars": 16425,
+    "file_count": 60,
+    "total_lines": 23451,
+    "status": "ok"
+  },
+  {
+    "repo": "psf/black",
+    "stars": 41491,
+    "file_count": 59,
+    "total_lines": 20456,
+    "status": "ok"
+  },
+  {
+    "repo": "pyca/cryptography",
+    "stars": 7581,
+    "file_count": 100,
+    "total_lines": 11148,
+    "status": "ok"
+  },
+  {
+    "repo": "paramiko/paramiko",
+    "stars": 9742,
+    "file_count": 55,
+    "total_lines": 19087,
+    "status": "ok"
+  },
+  {
+    "repo": "dateutil/dateutil",
+    "stars": 2614,
+    "file_count": 20,
+    "total_lines": 5618,
+    "status": "ok"
+  },
+  {
+    "repo": "pillow/Pillow",
+    "stars": 0,
+    "file_count": 0,
+    "total_lines": 0,
+    "status": "skipped"
+  },
+  {
+    "repo": "benoitc/gunicorn",
+    "stars": 10559,
+    "file_count": 76,
+    "total_lines": 23308,
+    "status": "ok"
+  },
+  {
+    "repo": "tornadoweb/tornado",
+    "stars": 22182,
+    "file_count": 58,
+    "total_lines": 21853,
+    "status": "ok"
+  },
+  {
+    "repo": "pallets/click",
+    "stars": 17466,
+    "file_count": 17,
+    "total_lines": 8615,
+    "status": "ok"
+  },
+  {
+    "repo": "encode/httpx",
+    "stars": 15261,
+    "file_count": 23,
+    "total_lines": 7532,
+    "status": "ok"
+  },
+  {
+    "repo": "pypa/pip",
+    "stars": 10189,
+    "file_count": 100,
+    "total_lines": 21028,
+    "status": "ok"
+  }
+]

@@ -950,13 +950,13 @@ def main() -> None:
                 "file_path": str(source_path.resolve()),
                 "unified_risk_score": final_report.unified_risk_score,
                 "risk_tier": final_report.risk_tier,
-                "fusion_weights": exporter._convert(final_report.fusion_weights),
+                "fusion_weights": exporter.convert(final_report.fusion_weights),
                 "per_function_metrics": [
-                    exporter._convert(dataclasses.asdict(fr))
+                    exporter.convert(dataclasses.asdict(fr))
                     for fr in final_report.validation.function_reports.values()
                 ],
                 "security_findings": [
-                    exporter._convert(dataclasses.asdict(t))
+                    exporter.convert(dataclasses.asdict(t))
                     for t in final_report.security.threats
                 ],
                 "delta": {
@@ -982,17 +982,24 @@ def main() -> None:
             "file_path": str(source_path.resolve()),
             "unified_risk_score": final_report.unified_risk_score,
             "risk_tier": final_report.risk_tier,
-            "fusion_weights": exporter._convert(final_report.fusion_weights),
+            "fusion_weights": exporter.convert(final_report.fusion_weights),
             "per_function_metrics": [
-                exporter._convert(dataclasses.asdict(fr))
+                exporter.convert(dataclasses.asdict(fr))
                 for fr in final_report.validation.function_reports.values()
             ],
             "security_findings": [
-                exporter._convert(dataclasses.asdict(t))
+                exporter.convert(dataclasses.asdict(t))
                 for t in final_report.security.threats
             ],
         }
+        # Emit to stdout for piping and persist to output.json for IDE integration.
         print(json.dumps(payload, separators=(",", ":")))
+        output_path = Path("output.json")
+        try:
+            with open(output_path, "w", encoding="utf-8") as f:
+                json.dump(payload, f, indent=2, ensure_ascii=False)
+        except Exception as exc:  # pragma: no cover
+            logger.warning("Could not write output.json: %s", exc)
         return
 
     # Static post-run summary (after Live context has exited)

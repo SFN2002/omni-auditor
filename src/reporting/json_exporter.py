@@ -16,23 +16,23 @@ class JSONExporter:
     """
 
     @staticmethod
-    def _convert(obj: Any) -> Any:
+    def convert(obj: Any) -> Any:
         """Recursively convert numpy arrays / tensors to plain Python."""
         if hasattr(obj, "tolist"):
             return obj.tolist()
         if isinstance(obj, dict):
-            return {k: JSONExporter._convert(v) for k, v in obj.items()}
+            return {k: JSONExporter.convert(v) for k, v in obj.items()}
         if isinstance(obj, list):
-            return [JSONExporter._convert(v) for v in obj]
+            return [JSONExporter.convert(v) for v in obj]
         if isinstance(obj, tuple):
-            return [JSONExporter._convert(v) for v in obj]
+            return [JSONExporter.convert(v) for v in obj]
         if isinstance(obj, set):
-            return sorted([JSONExporter._convert(v) for v in obj])
+            return sorted([JSONExporter.convert(v) for v in obj])
         return obj
 
     def export(self, report: object, output_path: Path) -> None:
         """Serialize a report dataclass to a pretty-printed JSON file."""
-        payload = self._convert(dataclasses.asdict(report))
+        payload = self.convert(dataclasses.asdict(report))
         output_path.write_text(
             json.dumps(payload, indent=2, ensure_ascii=False),
             encoding="utf-8",
@@ -40,5 +40,5 @@ class JSONExporter:
 
     def to_compact_json(self, report: object) -> str:
         """Serialize report to a compact JSON string (for ``--json`` CLI flag)."""
-        payload = self._convert(dataclasses.asdict(report))
+        payload = self.convert(dataclasses.asdict(report))
         return json.dumps(payload, separators=(",", ":"), ensure_ascii=False)

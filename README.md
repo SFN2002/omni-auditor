@@ -6,7 +6,7 @@
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 ![Code style: strict typing](https://img.shields.io/badge/code%20style-strict%20typing-blue)
 ![PyPI](https://img.shields.io/pypi/v/omni-auditor)
-![CI](https://github.com/SFN2002/omni-auditor/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/omni-auditor/omni-auditor/actions/workflows/ci.yml/badge.svg)
 
 ---
 
@@ -87,7 +87,7 @@ jobs:
 
       - name: Run Omni-Auditor
         id: omni-auditor
-        uses: SFN2002/omni-auditor@main
+        uses: omni-auditor/omni-auditor@main
         with:
           path: "."
           threshold: "0.7"

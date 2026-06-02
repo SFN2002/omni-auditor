@@ -12,6 +12,9 @@ env/
 # Omni-Auditor cache
 .omni_cache/
 
+# Output
+output.json
+
 # IDEs
 .idea/
 .vscode/
@@ -28,3 +31,13 @@ build/
 # OS
 .DS_Store
 Thumbs.db
+
+# VS Code Extension
+vscode-extension/out/
+*.vsix
+
+# Benchmark datasets
+tests/benchmarks/dataset/downloaded/
+
+*.egg
+

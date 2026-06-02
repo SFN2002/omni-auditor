@@ -61,6 +61,24 @@ class TestValidator(unittest.TestCase):
 
         self.assertGreater(h_uniform, h_concentrated)
 
+    def test_covariance_is_positive_semi_definite(self) -> None:
+        """Verify the regularised covariance matrix has non-negative eigenvalues."""
+        rng = np.random.default_rng(42)
+        X = rng.standard_normal((20, 10), dtype=np.float64)
+        est = CovarianceEstimator(X)
+        eigvals = np.linalg.eigvalsh(est.regularized_covariance)
+        self.assertTrue(np.all(eigvals >= -1e-12))
+
+    def test_mahalanobis_is_non_negative(self) -> None:
+        """Verify squared Mahalanobis distance is always >= 0."""
+        rng = np.random.default_rng(7)
+        X = rng.standard_normal((15, 8), dtype=np.float64)
+        est = CovarianceEstimator(X)
+        for _ in range(10):
+            x = rng.standard_normal(8, dtype=np.float64)
+            d2 = est.mahalanobis_squared(x)
+            self.assertGreaterEqual(d2, 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()

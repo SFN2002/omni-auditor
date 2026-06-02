@@ -1,0 +1,1 @@
+"""Omni-Auditor GitHub App."""
