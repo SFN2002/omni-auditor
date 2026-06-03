@@ -75,8 +75,8 @@
       "properties": {
         "omniAuditor.pythonPath": {
           "type": "string",
-          "default": "python",
-          "description": "Path to the Python 3.10+ executable"
+          "default": "",
+          "description": "Path to Python executable. Leave empty to auto-detect from Python extension or system PATH."
         },
         "omniAuditor.projectRoot": {
           "type": "string",

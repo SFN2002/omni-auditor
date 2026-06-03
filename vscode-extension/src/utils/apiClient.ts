@@ -25,6 +25,23 @@ function isValidPythonPath(p: string): boolean {
     return base.includes('python');
 }
 
+async function resolvePythonPath(): Promise<string> {
+    // 1. Official Python extension interpreter (if installed)
+    const pythonExtPath = vscode.workspace.getConfiguration('python').get<string>('pythonPath');
+    if (pythonExtPath && pythonExtPath.trim().length > 0) {
+        return pythonExtPath.trim();
+    }
+
+    // 2. Omni-Auditor manual setting
+    const omniPath = vscode.workspace.getConfiguration('omniAuditor').get<string>('pythonPath');
+    if (omniPath && omniPath.trim().length > 0) {
+        return omniPath.trim();
+    }
+
+    // 3. Platform fallback
+    return process.platform === 'win32' ? 'python' : 'python3';
+}
+
 async function resolveProjectRoot(filePath?: string): Promise<string | undefined> {
     // 1. Walk up from the active file looking for src/main.py
     if (filePath) {
@@ -79,7 +96,7 @@ export class ApiClient {
     private getConfig() {
         const cfg = vscode.workspace.getConfiguration('omniAuditor');
         return {
-            pythonPath: cfg.get<string>('pythonPath') || 'python',
+            pythonPath: cfg.get<string>('pythonPath') || '',
             projectRoot: cfg.get<string>('projectRoot') || '',
             threshold: cfg.get<number>('threshold') || 0.7,
         };
@@ -122,6 +139,7 @@ export class ApiClient {
 
     private async runAnalysis(filePath: string, token?: vscode.CancellationToken): Promise<OmniReport | null> {
         let { pythonPath, projectRoot, threshold } = this.getConfig();
+        pythonPath = await resolvePythonPath();
 
         // Resolve projectRoot if not explicitly configured
         if (!projectRoot) {

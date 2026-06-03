@@ -1,0 +1,216 @@
+{
+  "dataset_size": 21,
+  "vulnerable": 6,
+  "benign": 15,
+  "per_file": [
+    {
+      "file": "benchmarks-dataset/Command Injection/tainted.py",
+      "label": "VULNERABLE",
+      "omni_flagged": true,
+      "omni_tier": "CRITICAL",
+      "omni_findings": 1,
+      "bandit_flagged": true,
+      "bandit_issues": 2
+    },
+    {
+      "file": "benchmarks-dataset/Path Traversal/py_ctf.py",
+      "label": "VULNERABLE",
+      "omni_flagged": true,
+      "omni_tier": "CRITICAL",
+      "omni_findings": 1,
+      "bandit_flagged": true,
+      "bandit_issues": 1
+    },
+    {
+      "file": "benchmarks-dataset/Server Side Template Injection/asis_ssti_pt.py",
+      "label": "VULNERABLE",
+      "omni_flagged": true,
+      "omni_tier": "CRITICAL",
+      "omni_findings": 1,
+      "bandit_flagged": true,
+      "bandit_issues": 1
+    },
+    {
+      "file": "benchmarks-dataset/Server Side Template Injection/test.py",
+      "label": "VULNERABLE",
+      "omni_flagged": false,
+      "omni_tier": "MEDIUM",
+      "omni_findings": 0,
+      "bandit_flagged": false,
+      "bandit_issues": 0
+    },
+    {
+      "file": "benchmarks-dataset/Unsafe Deserialization/CVE-2017-2809.py",
+      "label": "VULNERABLE",
+      "omni_flagged": true,
+      "omni_tier": "CRITICAL",
+      "omni_findings": 1,
+      "bandit_flagged": false,
+      "bandit_issues": 0
+    },
+    {
+      "file": "benchmarks-dataset/Unsafe Deserialization/pickle2.py",
+      "label": "VULNERABLE",
+      "omni_flagged": false,
+      "omni_tier": "N/A",
+      "omni_findings": 0,
+      "bandit_flagged": false,
+      "bandit_issues": 0
+    },
+    {
+      "file": "tests/benchmarks/dataset/downloaded/anthropics_skills/skills/docx/scripts/accept_changes.py",
+      "label": "BENIGN",
+      "omni_flagged": true,
+      "omni_tier": "CRITICAL",
+      "omni_findings": 3,
+      "bandit_flagged": true,
+      "bandit_issues": 5
+    },
+    {
+      "file": "tests/benchmarks/dataset/downloaded/anthropics_skills/skills/docx/scripts/office/pack.py",
+      "label": "BENIGN",
+      "omni_flagged": true,
+      "omni_tier": "CRITICAL",
+      "omni_findings": 2,
+      "bandit_flagged": false,
+      "bandit_issues": 0
+    },
+    {
+      "file": "tests/benchmarks/dataset/downloaded/anthropics_skills/skills/docx/scripts/office/soffice.py",
+      "label": "BENIGN",
+      "omni_flagged": true,
+      "omni_tier": "HIGH",
+      "omni_findings": 2,
+      "bandit_flagged": true,
+      "bandit_issues": 4
+    },
+    {
+      "file": "tests/benchmarks/dataset/downloaded/anthropics_skills/skills/pdf/scripts/check_bounding_boxes.py",
+      "label": "BENIGN",
+      "omni_flagged": true,
+      "omni_tier": "CRITICAL",
+      "omni_findings": 1,
+      "bandit_flagged": false,
+      "bandit_issues": 0
+    },
+    {
+      "file": "tests/benchmarks/dataset/downloaded/anthropics_skills/skills/pdf/scripts/convert_pdf_to_images.py",
+      "label": "BENIGN",
+      "omni_flagged": true,
+      "omni_tier": "HIGH",
+      "omni_findings": 1,
+      "bandit_flagged": false,
+      "bandit_issues": 0
+    },
+    {
+      "file": "tests/benchmarks/dataset/downloaded/anthropics_skills/skills/pptx/scripts/add_slide.py",
+      "label": "BENIGN",
+      "omni_flagged": true,
+      "omni_tier": "CRITICAL",
+      "omni_findings": 2,
+      "bandit_flagged": false,
+      "bandit_issues": 0
+    },
+    {
+      "file": "tests/benchmarks/dataset/downloaded/anthropics_skills/skills/pptx/scripts/thumbnail.py",
+      "label": "BENIGN",
+      "omni_flagged": true,
+      "omni_tier": "HIGH",
+      "omni_findings": 2,
+      "bandit_flagged": true,
+      "bandit_issues": 5
+    },
+    {
+      "file": "tests/benchmarks/dataset/downloaded/anthropics_skills/skills/skill-creator/scripts/aggregate_benchmark.py",
+      "label": "BENIGN",
+      "omni_flagged": true,
+      "omni_tier": "CRITICAL",
+      "omni_findings": 5,
+      "bandit_flagged": false,
+      "bandit_issues": 0
+    },
+    {
+      "file": "tests/benchmarks/dataset/downloaded/anthropics_skills/skills/skill-creator/scripts/generate_report.py",
+      "label": "BENIGN",
+      "omni_flagged": true,
+      "omni_tier": "CRITICAL",
+      "omni_findings": 2,
+      "bandit_flagged": false,
+      "bandit_issues": 0
+    },
+    {
+      "file": "src/engine/analyzer.py",
+      "label": "BENIGN",
+      "omni_flagged": true,
+      "omni_tier": "CRITICAL",
+      "omni_findings": 5,
+      "bandit_flagged": false,
+      "bandit_issues": 0
+    },
+    {
+      "file": "src/engine/security.py",
+      "label": "BENIGN",
+      "omni_flagged": true,
+      "omni_tier": "CRITICAL",
+      "omni_findings": 9,
+      "bandit_flagged": false,
+      "bandit_issues": 0
+    },
+    {
+      "file": "github-app/analyzer.py",
+      "label": "BENIGN",
+      "omni_flagged": true,
+      "omni_tier": "CRITICAL",
+      "omni_findings": 0,
+      "bandit_flagged": true,
+      "bandit_issues": 1
+    },
+    {
+      "file": "tests/test_analyzer.py",
+      "label": "BENIGN",
+      "omni_flagged": false,
+      "omni_tier": "MEDIUM",
+      "omni_findings": 0,
+      "bandit_flagged": false,
+      "bandit_issues": 0
+    },
+    {
+      "file": "tests/test_security.py",
+      "label": "BENIGN",
+      "omni_flagged": false,
+      "omni_tier": "MEDIUM",
+      "omni_findings": 0,
+      "bandit_flagged": false,
+      "bandit_issues": 0
+    },
+    {
+      "file": "dashboard.py",
+      "label": "BENIGN",
+      "omni_flagged": true,
+      "omni_tier": "CRITICAL",
+      "omni_findings": 0,
+      "bandit_flagged": false,
+      "bandit_issues": 0
+    }
+  ],
+  "omni_auditor": {
+    "TP": 4,
+    "FP": 13,
+    "FN": 2,
+    "TN": 2,
+    "Precision": 0.23529411764705882,
+    "Recall": 0.6666666666666666,
+    "F1": 0.3478260869565218,
+    "Accuracy": 0.2857142857142857
+  },
+  "bandit": {
+    "TP": 3,
+    "FP": 4,
+    "FN": 3,
+    "TN": 11,
+    "Precision": 0.42857142857142855,
+    "Recall": 0.5,
+    "F1": 0.4615384615384615,
+    "Accuracy": 0.6666666666666666
+  }
+}

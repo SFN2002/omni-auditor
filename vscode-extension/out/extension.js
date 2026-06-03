@@ -123,17 +123,22 @@ function activate(context) {
                 decorationProvider.applyDecorations(editor, report.security_findings);
             }
             else if (decorationProvider) {
-                decorationProvider.clearDecorations();
+                decorationProvider.clearEditor(editor);
             }
         }
         else {
             statusBarItem.text = '$(shield) Omni-Auditor';
             statusBarItem.color = undefined;
-            decorationProvider?.clearDecorations();
+            if (editor && decorationProvider) {
+                decorationProvider.clearEditor(editor);
+            }
         }
     }));
-    context.subscriptions.push(vscode.workspace.onDidCloseTextDocument((_doc) => {
-        decorationProvider?.clearDecorations();
+    context.subscriptions.push(vscode.workspace.onDidCloseTextDocument((doc) => {
+        const editor = vscode.window.visibleTextEditors.find(e => e.document.uri.fsPath === doc.uri.fsPath);
+        if (editor && decorationProvider) {
+            decorationProvider.clearEditor(editor);
+        }
     }));
     // ── React to external output.json changes ─────────────────────────────
     context.subscriptions.push(apiClient.onDidChange((filePath) => {

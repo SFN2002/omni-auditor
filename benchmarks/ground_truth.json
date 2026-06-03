@@ -1,0 +1,163 @@
+{
+  "dataset_size": 26,
+  "vulnerable": 11,
+  "benign": 15,
+  "files": [
+    {
+      "path": "benchmarks-dataset/Command Injection/tainted.py",
+      "label": "VULNERABLE",
+      "cwe": "CWE-78 (OS Command Injection)",
+      "notes": "os.system(request.remote_addr) with tainted input; Flask debug=True"
+    },
+    {
+      "path": "benchmarks-dataset/Path Traversal/py_ctf.py",
+      "label": "VULNERABLE",
+      "cwe": "CWE-22 (Path Traversal), CWE-94 (Code Injection)",
+      "notes": "open('/home/golem/articles/{}'.format(page)) with user input; render_template_string with % formatting; execfile"
+    },
+    {
+      "path": "benchmarks-dataset/Server Side Template Injection/test.py",
+      "label": "VULNERABLE",
+      "cwe": "CWE-1336 (SSTI)",
+      "notes": "Jinja2 Template built from request.args['name']"
+    },
+    {
+      "path": "benchmarks-dataset/Unsafe Deserialization/CVE-2017-2809.py",
+      "label": "VULNERABLE",
+      "cwe": "CWE-502 (Deserialization)",
+      "notes": "yaml.load(stream) without Loader=safe parameter"
+    },
+    {
+      "path": "benchmarks-dataset/Unsafe Deserialization/pickle2.py",
+      "label": "VULNERABLE",
+      "cwe": "CWE-502 (Deserialization), CWE-798 (Hardcoded Credentials)",
+      "notes": "pickle.loads on user-supplied cookie; hard-coded SECRET_KEY"
+    },
+    {
+      "path": "benchmarks-dataset/Server Side Template Injection/asis_ssti_pt.py",
+      "label": "VULNERABLE",
+      "cwe": "CWE-1336 (SSTI), CWE-22 (Path Traversal)",
+      "notes": "Same py_ctf pattern duplicated in SSTI folder"
+    },
+    {
+      "path": "tests/benchmarks/dataset/downloaded/AUTOMATIC1111_stable-diffusion-webui/scripts/custom_code.py",
+      "label": "VULNERABLE",
+      "cwe": "CWE-94 (Code Injection)",
+      "notes": "eval(compile(...), module.__dict__) executes dynamically compiled user-provided code"
+    },
+    {
+      "path": "tests/benchmarks/dataset/downloaded/pytorch_pytorch/tools/linter/adapters/nativefunctions_linter.py",
+      "label": "VULNERABLE",
+      "cwe": "CWE-502 (Deserialization)",
+      "notes": "yaml.load(contents) without safe Loader on lint target files"
+    },
+    {
+      "path": "tests/benchmarks/dataset/downloaded/pytorch_pytorch/.github/scripts/lint_native_functions.py",
+      "label": "VULNERABLE",
+      "cwe": "CWE-502 (Deserialization)",
+      "notes": "yaml.load(contents) without safe Loader on lint target files"
+    },
+    {
+      "path": "tests/benchmarks/dataset/downloaded/Significant-Gravitas_AutoGPT/autogpt_platform/backend/backend/util/cache.py",
+      "label": "VULNERABLE",
+      "cwe": "CWE-502 (Deserialization), CWE-798 (Hardcoded Credentials)",
+      "notes": "pickle.loads(payload) on cache payload from Redis; hardcoded secret = 'autogpt-cache-default-hmac-key'"
+    },
+    {
+      "path": "tests/benchmarks/dataset/downloaded/pytorch_pytorch/benchmarks/dynamo/runner.py",
+      "label": "VULNERABLE",
+      "cwe": "CWE-78 (OS Command Injection)",
+      "notes": "os.system(f'bash {generated_file}') with variable interpolation; generated_file is internal but criteria flags any os.system with variables"
+    },
+    {
+      "path": "tests/benchmarks/dataset/downloaded/anthropics_skills/skills/docx/scripts/accept_changes.py",
+      "label": "BENIGN",
+      "cwe": "\u2014",
+      "notes": "Docx manipulation helper, no dangerous calls"
+    },
+    {
+      "path": "tests/benchmarks/dataset/downloaded/anthropics_skills/skills/docx/scripts/office/pack.py",
+      "label": "BENIGN",
+      "cwe": "\u2014",
+      "notes": "Office document packing utility"
+    },
+    {
+      "path": "tests/benchmarks/dataset/downloaded/anthropics_skills/skills/docx/scripts/office/soffice.py",
+      "label": "BENIGN",
+      "cwe": "\u2014",
+      "notes": "LibreOffice wrapper with safe subprocess usage"
+    },
+    {
+      "path": "tests/benchmarks/dataset/downloaded/anthropics_skills/skills/pdf/scripts/check_bounding_boxes.py",
+      "label": "BENIGN",
+      "cwe": "\u2014",
+      "notes": "PDF geometry checker"
+    },
+    {
+      "path": "tests/benchmarks/dataset/downloaded/anthropics_skills/skills/pdf/scripts/convert_pdf_to_images.py",
+      "label": "BENIGN",
+      "cwe": "\u2014",
+      "notes": "PDF-to-image conversion using Pillow"
+    },
+    {
+      "path": "tests/benchmarks/dataset/downloaded/anthropics_skills/skills/pptx/scripts/add_slide.py",
+      "label": "BENIGN",
+      "cwe": "\u2014",
+      "notes": "PowerPoint slide builder"
+    },
+    {
+      "path": "tests/benchmarks/dataset/downloaded/anthropics_skills/skills/pptx/scripts/thumbnail.py",
+      "label": "BENIGN",
+      "cwe": "\u2014",
+      "notes": "Thumbnail generator"
+    },
+    {
+      "path": "tests/benchmarks/dataset/downloaded/anthropics_skills/skills/skill-creator/scripts/aggregate_benchmark.py",
+      "label": "BENIGN",
+      "cwe": "\u2014",
+      "notes": "Benchmark aggregation script"
+    },
+    {
+      "path": "tests/benchmarks/dataset/downloaded/anthropics_skills/skills/skill-creator/scripts/generate_report.py",
+      "label": "BENIGN",
+      "cwe": "\u2014",
+      "notes": "Report generator"
+    },
+    {
+      "path": "src/engine/analyzer.py",
+      "label": "BENIGN",
+      "cwe": "\u2014",
+      "notes": "Omni-Auditor's own spectral analyser (production code)"
+    },
+    {
+      "path": "src/engine/security.py",
+      "label": "BENIGN",
+      "cwe": "\u2014",
+      "notes": "Omni-Auditor's own security scanner (production code)"
+    },
+    {
+      "path": "src/engine/baseline.py",
+      "label": "BENIGN",
+      "cwe": "\u2014",
+      "notes": "Omni-Auditor's baseline manager (production code)"
+    },
+    {
+      "path": "src/engine/diff.py",
+      "label": "BENIGN",
+      "cwe": "\u2014",
+      "notes": "Omni-Auditor's spectral diff engine (production code)"
+    },
+    {
+      "path": "src/engine/validator.py",
+      "label": "BENIGN",
+      "cwe": "\u2014",
+      "notes": "Omni-Auditor's statistical validator (production code)"
+    },
+    {
+      "path": "tests/test_analyzer.py",
+      "label": "BENIGN",
+      "cwe": "\u2014",
+      "notes": "Unit tests for the analyser"
+    }
+  ]
+}

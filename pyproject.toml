@@ -15,8 +15,15 @@ dependencies = [
     "rich>=13.0.0",
 ]
 
+[project.optional-dependencies]
+test = ["pytest", "pytest-cov"]
+
 [project.scripts]
-omni-auditor = "src.main:main"
+omni-auditor = "src.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--ignore=tests/benchmarks/dataset --ignore=tests/benchmarks/datasets"
 
 [tool.setuptools.packages.find]
 where = ["."]
