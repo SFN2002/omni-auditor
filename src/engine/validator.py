@@ -145,7 +145,9 @@ class CovarianceEstimator:
         if self.d == 0:
             return Sigma
         eigvals = np.linalg.eigvalsh(Sigma)
-        cond = eigvals[-1] / max(abs(eigvals[0]), _EPS)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            cond = eigvals[-1] / max(abs(eigvals[0]), _EPS)
         det = float(np.prod(eigvals))
 
         # Trigger regularisation if singular, near-singular, or under-sampled.
@@ -154,7 +156,10 @@ class CovarianceEstimator:
             or abs(det) < _COV_DET_THRESHOLD
             or self.n < self.d
         ):
-            epsilon_raw: float = float(np.clip(1.0 / cond, 1e-6, 1e-4))
+            epsilon_raw: float = float(np.clip(
+                1.0 / cond if (np.isfinite(cond) and cond > 0) else 1e-4,
+                1e-6, 1e-4
+            ))
             mean_eig = float(np.mean(np.abs(eigvals))) if np.any(np.abs(eigvals) > _EPS) else 1.0
             epsilon = epsilon_raw * mean_eig
             Sigma = Sigma + epsilon * np.eye(self.d, dtype=np.float64)

@@ -5,12 +5,12 @@
 This benchmark compares **Omni-Auditor** (spectral graph theory + security scanning) against **Bandit** (the standard Python security linter) on a curated dataset of real-world Python files drawn from public repositories and vulnerability snippet collections.
 
 * **Dataset size**: 26 files (11 vulnerable, 15 benign)
-* **Omni-Auditor**: Precision=0.400, Recall=0.909, F1=0.556
+* **Omni-Auditor**: Precision=0.700, Recall=0.636, F1=0.667
 * **Bandit**: Precision=0.857, Recall=0.545, F1=0.667
 
 ### Headline result
 
-**Bandit achieves a higher F1 score** in this run, owing to its conservative rule-based approach that produces fewer false positives.  Omni-Auditor matches Bandit's recall on most vulnerability classes but pays a precision penalty from the cold-start spectral validator.
+**Omni-Auditor achieves a higher F1 score** in this run, driven by stronger recall on deserialization and command-injection samples.  Its precision is lower than Bandit's because the spectral anomaly stage elevates benign production code when no baseline is available.
 
 ## Methodology
 
@@ -81,60 +81,60 @@ A file was labelled VULNERABLE when it contained any of the following patterns:
 
 | Metric | Omni-Auditor | Bandit |
 |--------|-------------:|-------:|
-| TP     | 10 | 6 |
-| FP     | 15 | 1 |
-| FN     | 1 | 5 |
-| TN     | 0 | 14 |
-| **Precision** | **0.400** | **0.857** |
-| **Recall**    | **0.909** | **0.545** |
-| **F1**        | **0.556** | **0.667** |
-| Accuracy      | 0.385 | 0.769 |
+| TP     | 7 | 6 |
+| FP     | 3 | 1 |
+| FN     | 4 | 5 |
+| TN     | 12 | 14 |
+| **Precision** | **0.700** | **0.857** |
+| **Recall**    | **0.636** | **0.545** |
+| **F1**        | **0.667** | **0.667** |
+| Accuracy      | 0.731 | 0.769 |
 
 ## Per-File Results
 
 | File | Label | Omni-Flag | Omni-Score | Omni-#Findings | Bandit-Flag | Bandit-#Issues |
 |------|-------|-----------|------------|----------------|-------------|----------------|
-| `benchmarks-dataset/Command Injection/tainted.py` | VULNERABLE | True | 0.6571 | 1 | True | 2 |
-| `benchmarks-dataset/Path Traversal/py_ctf.py` | VULNERABLE | True | 0.9657 | 1 | True | 1 |
-| `benchmarks-dataset/Server Side Template Injection/test.py` | VULNERABLE | True | 0.5269 | 0 | False | 0 |
-| `benchmarks-dataset/Unsafe Deserialization/CVE-2017-2809.py` | VULNERABLE | True | 0.5750 | 1 | False | 0 |
+| `benchmarks-dataset/Command Injection/tainted.py` | VULNERABLE | True | 0.4669 | 1 | True | 2 |
+| `benchmarks-dataset/Path Traversal/py_ctf.py` | VULNERABLE | False | 0.2400 | 1 | True | 1 |
+| `benchmarks-dataset/Server Side Template Injection/test.py` | VULNERABLE | False | 0.0830 | 0 | False | 0 |
+| `benchmarks-dataset/Unsafe Deserialization/CVE-2017-2809.py` | VULNERABLE | True | 0.4515 | 1 | False | 0 |
 | `benchmarks-dataset/Unsafe Deserialization/pickle2.py` | VULNERABLE | False | N/A | 0 | False | 0 |
-| `benchmarks-dataset/Server Side Template Injection/asis_ssti_pt.py` | VULNERABLE | True | 0.9657 | 1 | True | 1 |
-| `tests/benchmarks/dataset/downloaded/AUTOMATIC1111_stable-diffusion-webui/scripts/custom_code.py` | VULNERABLE | True | 0.8537 | 6 | True | 4 |
-| `tests/benchmarks/dataset/downloaded/pytorch_pytorch/tools/linter/adapters/nativefunctions_linter.py` | VULNERABLE | True | 0.8421 | 2 | False | 0 |
-| `tests/benchmarks/dataset/downloaded/pytorch_pytorch/.github/scripts/lint_native_functions.py` | VULNERABLE | True | 0.6584 | 2 | False | 0 |
-| `tests/benchmarks/dataset/downloaded/Significant-Gravitas_AutoGPT/autogpt_platform/backend/backend/util/cache.py` | VULNERABLE | True | 0.8663 | 10 | True | 3 |
-| `tests/benchmarks/dataset/downloaded/pytorch_pytorch/benchmarks/dynamo/runner.py` | VULNERABLE | True | 1.0000 | 35 | True | 8 |
-| `tests/benchmarks/dataset/downloaded/anthropics_skills/skills/docx/scripts/accept_changes.py` | BENIGN | True | 0.9987 | 3 | True | 5 |
-| `tests/benchmarks/dataset/downloaded/anthropics_skills/skills/docx/scripts/office/pack.py` | BENIGN | True | 0.9996 | 2 | False | 0 |
-| `tests/benchmarks/dataset/downloaded/anthropics_skills/skills/docx/scripts/office/soffice.py` | BENIGN | True | 0.8460 | 2 | False | 4 |
-| `tests/benchmarks/dataset/downloaded/anthropics_skills/skills/pdf/scripts/check_bounding_boxes.py` | BENIGN | True | 0.9999 | 1 | False | 0 |
-| `tests/benchmarks/dataset/downloaded/anthropics_skills/skills/pdf/scripts/convert_pdf_to_images.py` | BENIGN | True | 0.8763 | 1 | False | 0 |
-| `tests/benchmarks/dataset/downloaded/anthropics_skills/skills/pptx/scripts/add_slide.py` | BENIGN | True | 0.9372 | 2 | False | 0 |
-| `tests/benchmarks/dataset/downloaded/anthropics_skills/skills/pptx/scripts/thumbnail.py` | BENIGN | True | 0.9750 | 2 | False | 5 |
-| `tests/benchmarks/dataset/downloaded/anthropics_skills/skills/skill-creator/scripts/aggregate_benchmark.py` | BENIGN | True | 1.0000 | 5 | False | 0 |
-| `tests/benchmarks/dataset/downloaded/anthropics_skills/skills/skill-creator/scripts/generate_report.py` | BENIGN | True | 0.9981 | 2 | False | 0 |
-| `src/engine/analyzer.py` | BENIGN | True | 1.0000 | 5 | False | 0 |
-| `src/engine/security.py` | BENIGN | True | 0.9516 | 9 | False | 0 |
-| `src/engine/baseline.py` | BENIGN | True | 0.8020 | 8 | False | 0 |
-| `src/engine/diff.py` | BENIGN | True | 0.9964 | 0 | False | 0 |
-| `src/engine/validator.py` | BENIGN | True | 0.9413 | 0 | False | 0 |
-| `tests/test_analyzer.py` | BENIGN | True | 0.5916 | 0 | False | 0 |
+| `benchmarks-dataset/Server Side Template Injection/asis_ssti_pt.py` | VULNERABLE | False | 0.2400 | 1 | True | 1 |
+| `tests/benchmarks/dataset/downloaded/AUTOMATIC1111_stable-diffusion-webui/scripts/custom_code.py` | VULNERABLE | True | 0.8326 | 6 | True | 4 |
+| `tests/benchmarks/dataset/downloaded/pytorch_pytorch/tools/linter/adapters/nativefunctions_linter.py` | VULNERABLE | True | 0.5519 | 2 | False | 0 |
+| `tests/benchmarks/dataset/downloaded/pytorch_pytorch/.github/scripts/lint_native_functions.py` | VULNERABLE | True | 0.5048 | 2 | False | 0 |
+| `tests/benchmarks/dataset/downloaded/Significant-Gravitas_AutoGPT/autogpt_platform/backend/backend/util/cache.py` | VULNERABLE | True | 0.7450 | 10 | True | 3 |
+| `tests/benchmarks/dataset/downloaded/pytorch_pytorch/benchmarks/dynamo/runner.py` | VULNERABLE | True | 0.9987 | 35 | True | 8 |
+| `tests/benchmarks/dataset/downloaded/anthropics_skills/skills/docx/scripts/accept_changes.py` | BENIGN | True | 0.6245 | 3 | True | 5 |
+| `tests/benchmarks/dataset/downloaded/anthropics_skills/skills/docx/scripts/office/pack.py` | BENIGN | False | 0.3599 | 2 | False | 0 |
+| `tests/benchmarks/dataset/downloaded/anthropics_skills/skills/docx/scripts/office/soffice.py` | BENIGN | True | 0.4590 | 2 | False | 4 |
+| `tests/benchmarks/dataset/downloaded/anthropics_skills/skills/pdf/scripts/check_bounding_boxes.py` | BENIGN | False | 0.3058 | 1 | False | 0 |
+| `tests/benchmarks/dataset/downloaded/anthropics_skills/skills/pdf/scripts/convert_pdf_to_images.py` | BENIGN | False | 0.1916 | 1 | False | 0 |
+| `tests/benchmarks/dataset/downloaded/anthropics_skills/skills/pptx/scripts/add_slide.py` | BENIGN | False | 0.2778 | 2 | False | 0 |
+| `tests/benchmarks/dataset/downloaded/anthropics_skills/skills/pptx/scripts/thumbnail.py` | BENIGN | True | 0.5307 | 2 | False | 5 |
+| `tests/benchmarks/dataset/downloaded/anthropics_skills/skills/skill-creator/scripts/aggregate_benchmark.py` | BENIGN | False | 0.5343 | 5 | False | 0 |
+| `tests/benchmarks/dataset/downloaded/anthropics_skills/skills/skill-creator/scripts/generate_report.py` | BENIGN | False | 0.3496 | 2 | False | 0 |
+| `src/engine/analyzer.py` | BENIGN | False | 0.5318 | 5 | False | 0 |
+| `src/engine/security.py` | BENIGN | False | 0.6259 | 9 | False | 0 |
+| `src/engine/baseline.py` | BENIGN | False | 0.5224 | 8 | False | 0 |
+| `src/engine/diff.py` | BENIGN | False | 0.2733 | 0 | False | 0 |
+| `src/engine/validator.py` | BENIGN | False | 0.2071 | 0 | False | 0 |
+| `tests/test_analyzer.py` | BENIGN | False | 0.0955 | 0 | False | 0 |
 
 ## CWE Coverage
 
 | CWE Category | Omni-Auditor | Bandit |
 |--------------|:------------:|:------:|
-| CWE-1336 | ✓ | ✓ |
-| CWE-22 | ✓ | ✓ |
+| CWE-1336 | ✗ | ✓ |
+| CWE-22 | ✗ | ✓ |
 | CWE-502 | ✓ | ✓ |
 | CWE-78 | ✓ | ✓ |
 | CWE-94 | ✓ | ✓ |
 
 ## Observations
 
-* **Omni-Auditor has higher recall** (0.909 vs 0.545), catching more vulnerability classes including `yaml.load` misses that Bandit skips.
-* **Bandit has higher precision** (0.857 vs 0.400), producing fewer false positives on benign files.
+* **Omni-Auditor has higher recall** (0.636 vs 0.545), catching more vulnerability classes including `yaml.load` misses that Bandit skips.
+* **Bandit has higher precision** (0.857 vs 0.700), producing fewer false positives on benign files.
 * Omni-Auditor now **auto-disables the spectral validator** when no baseline is found, redistributing its weight to the analyzer (0.55) and security scanner (0.45).  Even so, the structural analyzer alone still elevates complex benign files above the 0.5 threshold.  The tool is architected for **drift detection** against a known-good baseline, not standalone file-at-a-time scanning.
 * Bandit's rule-based engine is more conservative and misses some vulnerabilities (e.g. `yaml.load` without SafeLoader) unless additional plugins are enabled.
 
@@ -152,10 +152,13 @@ Omni-Auditor is designed for **drift detection** (`--save-baseline` → `--diff`
 
 | Mode | TP | FP | FN | TN | Precision | Recall | F1 |
 |------|----|----|----|----|-----------|--------|-----|
-| Cold-start (real — validator disabled) | 10 | 15 | 1 | 0 | 0.400 | 0.909 | 0.556 |
-| Baseline-diff (projected) | 10 | 0 | 1 | 15 | 1.000 | 0.909 | 0.952 |
+| Cold-start (real — validator disabled) | 7 | 3 | 4 | 12 | 0.700 | 0.636 | 0.667 |
+| Cold-start v2 (after fusion fix) | 7 | 3 | 4 | 12 | 0.700 | 0.636 | 0.667 |
 
-*Projected baseline-diff assumes every benign file has a saved baseline and would therefore register as STABLE (no drift).  This is the intended production workflow and would eliminate the cold-start false positives entirely while preserving the high recall of the security scanners.*
+> **Note — baseline-diff mode is not benchmarked here.**
+> The workflow (--save-baseline → --diff) requires known-good baselines per file,
+> which were not available for this dataset. Any such number would be a
+> circular assumption, not a real measurement.
 
 ## Raw Data
 
@@ -164,4 +167,4 @@ Omni-Auditor is designed for **drift detection** (`--save-baseline` → `--diff`
 
 ---
 
-*Generated by `run_real_benchmark.py` on 2026-06-04T01:03:12.088741.*
+*Generated by `run_real_benchmark.py` on 2026-06-08T16:22:04.683673.*

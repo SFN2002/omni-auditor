@@ -206,16 +206,13 @@ def run_bandit(file_path: str) -> dict[str, Any]:
 # ── Flagging criteria (per user spec) ─────────────────────────────────────────
 
 def omni_flagged(data: dict[str, Any]) -> bool:
-    """Flag if risk_score > 0.5 OR any threat severity HIGH/CRITICAL."""
-    score = data.get("unified_risk_score", 0.0)
-    if score > 0.5:
-        return True
+    """Flag if any CRITICAL/HIGH security finding, OR score > 0.65."""
+    score    = data.get("unified_risk_score", 0.0)
     findings = data.get("security_findings", [])
-    for f in findings:
-        sev = f.get("severity", "")
-        if sev in ("HIGH", "CRITICAL"):
-            return True
-    return False
+    has_hard_finding = any(
+        f.get("severity") in ("CRITICAL", "HIGH") for f in findings
+    )
+    return has_hard_finding or score > 0.65
 
 
 def bandit_flagged(data: dict[str, Any]) -> bool:

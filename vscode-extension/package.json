@@ -12,12 +12,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/omni-auditor/omni-auditor"
+    "url": "https://github.com/SFN2002/omni-auditor"
   },
   "bugs": {
-    "url": "https://github.com/omni-auditor/omni-auditor/issues"
+    "url": "https://github.com/SFN2002/omni-auditor/issues"
   },
-  "homepage": "https://github.com/omni-auditor/omni-auditor#readme",
+  "homepage": "https://github.com/SFN2002/omni-auditor#readme",
   "engines": {
     "vscode": "^1.74.0"
   },

@@ -86,40 +86,42 @@ class FusionEngine:
     # -- public entry ------------------------------------------------------
 
     def fuse(self, critical_threshold: float = 0.7) -> FinalReport:
-        """Fuse the three sub-reports into a single ``FinalReport``."""
-        # Fixed-dimension vectors (extracted from the engine dataclasses)
         a_vec = self._clamp_vector(self.analysis.aggregate_feature_vector, 56)
         v_vec = self._clamp_vector(self.validation.aggregate_anomaly_vector, 16)
         s_vec = self._clamp_vector(self.security.feature_vector, 18)
 
         w_a, w_v, w_s = self._compute_weights()
-
         if self.skip_validator:
             w_v = 0.0
-            w_a = 0.55
-            w_s = 0.45
+            w_a, w_s = 0.40, 0.60
 
-        # Weighted concatenation preserves every dimension while scaling
-        # each domain by its adaptive importance.
         fused = np.concatenate([w_a * a_vec, w_v * v_vec, w_s * s_vec])
 
-        # Base score: L2 norm of the fused representation.
-        score: float = float(np.linalg.norm(fused))
-
-        # Additive security boost (non-linear escalation for criticals).
+        # Gate 1: hard security signal
         critical = self.security.severity_counts.get("CRITICAL", 0)
-        high = self.security.severity_counts.get("HIGH", 0)
-        score += 0.5 * critical + 0.2 * high
+        high     = self.security.severity_counts.get("HIGH", 0)
+        medium   = self.security.severity_counts.get("MEDIUM", 0)
+        security_score = float(np.tanh(0.6 * critical + 0.25 * high + 0.08 * medium))
 
-        # Squash to [0, 1] via tanh for stable downstream interpretation.
-        unified = float(np.tanh(score / 10.0))
+        # Gate 2: structural anomaly (soft signal, normalised)
+        structural_raw = float(np.linalg.norm(np.concatenate([w_a * a_vec, w_v * v_vec])))
+        security_raw   = float(np.linalg.norm(w_s * s_vec))
+        structural_score = float(np.tanh(max(structural_raw - security_raw, 0.0) / 15.0))
 
-        # Risk tier with security override priority.
+        # Blend
+        if security_score > 0.05:
+            unified = 0.75 * security_score + 0.25 * structural_score
+        else:
+            unified = 0.30 * structural_score
+
+        unified = float(np.clip(unified, 0.0, 1.0))
+
+        # Tier
         if critical > 0 or unified >= critical_threshold:
             tier: Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"] = "CRITICAL"
-        elif high > 0 or unified >= 0.5:
+        elif high > 0 or unified >= 0.50:
             tier = "HIGH"
-        elif unified >= 0.3:
+        elif medium > 0 or unified >= 0.25:
             tier = "MEDIUM"
         else:
             tier = "LOW"

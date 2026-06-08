@@ -5,8 +5,7 @@
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 ![Code style: strict typing](https://img.shields.io/badge/code%20style-strict%20typing-blue)
-![PyPI](https://img.shields.io/pypi/v/omni-auditor)
-![CI](https://github.com/omni-auditor/omni-auditor/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/SFN2002/omni-auditor/actions/workflows/ci.yml/badge.svg)
 
 ---
 
@@ -169,7 +168,7 @@ jobs:
 
       - name: Run Omni-Auditor
         id: omni-auditor
-        uses: omni-auditor/omni-auditor@main
+        uses: SFN2002/omni-auditor@main
         with:
           path: "."
           threshold: "0.7"
@@ -279,6 +278,18 @@ cd vscode-extension && vsce package
 ```
 
 ---
+
+## Limitations
+
+- **Cold-start false positives on complex benign files** — Omni-Auditor's
+  spectral analyzer assigns higher structural scores to large, deeply nested
+  files (including `analyzer.py` itself). In cold-start mode (no saved baseline),
+  this can produce HIGH or CRITICAL tiers for benign code with complex control
+  flow. The tool is designed for **drift detection** (`--save-baseline` →
+  `--diff`): once a known-good baseline is saved, structural complexity is
+  normalised against it and false positives collapse. For standalone file
+  scanning without a baseline, rely on the **security findings list**, not
+  the risk tier alone.
 
 ## License
 

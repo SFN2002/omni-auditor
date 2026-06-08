@@ -6,7 +6,7 @@
       "label": "VULNERABLE",
       "cwe": "CWE-78 (OS Command Injection)",
       "omni_flagged": true,
-      "omni_risk_score": 0.6571496351723265,
+      "omni_risk_score": 0.4668791241126605,
       "omni_findings": 1,
       "bandit_flagged": true,
       "bandit_issues": 2
@@ -15,8 +15,8 @@
       "file": "benchmarks-dataset/Path Traversal/py_ctf.py",
       "label": "VULNERABLE",
       "cwe": "CWE-22 (Path Traversal), CWE-94 (Code Injection)",
-      "omni_flagged": true,
-      "omni_risk_score": 0.965689227547021,
+      "omni_flagged": false,
+      "omni_risk_score": 0.23997230672303377,
       "omni_findings": 1,
       "bandit_flagged": true,
       "bandit_issues": 1
@@ -25,8 +25,8 @@
       "file": "benchmarks-dataset/Server Side Template Injection/test.py",
       "label": "VULNERABLE",
       "cwe": "CWE-1336 (SSTI)",
-      "omni_flagged": true,
-      "omni_risk_score": 0.5268884513676734,
+      "omni_flagged": false,
+      "omni_risk_score": 0.08299141584026491,
       "omni_findings": 0,
       "bandit_flagged": false,
       "bandit_issues": 0
@@ -36,7 +36,7 @@
       "label": "VULNERABLE",
       "cwe": "CWE-502 (Deserialization)",
       "omni_flagged": true,
-      "omni_risk_score": 0.5749856390424326,
+      "omni_risk_score": 0.45150191878165646,
       "omni_findings": 1,
       "bandit_flagged": false,
       "bandit_issues": 0
@@ -55,8 +55,8 @@
       "file": "benchmarks-dataset/Server Side Template Injection/asis_ssti_pt.py",
       "label": "VULNERABLE",
       "cwe": "CWE-1336 (SSTI), CWE-22 (Path Traversal)",
-      "omni_flagged": true,
-      "omni_risk_score": 0.965689227547021,
+      "omni_flagged": false,
+      "omni_risk_score": 0.23997230672303377,
       "omni_findings": 1,
       "bandit_flagged": true,
       "bandit_issues": 1
@@ -66,7 +66,7 @@
       "label": "VULNERABLE",
       "cwe": "CWE-94 (Code Injection)",
       "omni_flagged": true,
-      "omni_risk_score": 0.8536693372253291,
+      "omni_risk_score": 0.8326326778931172,
       "omni_findings": 6,
       "bandit_flagged": true,
       "bandit_issues": 4
@@ -76,7 +76,7 @@
       "label": "VULNERABLE",
       "cwe": "CWE-502 (Deserialization)",
       "omni_flagged": true,
-      "omni_risk_score": 0.8420645448879702,
+      "omni_risk_score": 0.5519375176748537,
       "omni_findings": 2,
       "bandit_flagged": false,
       "bandit_issues": 0
@@ -86,7 +86,7 @@
       "label": "VULNERABLE",
       "cwe": "CWE-502 (Deserialization)",
       "omni_flagged": true,
-      "omni_risk_score": 0.6583556178156418,
+      "omni_risk_score": 0.504772864489287,
       "omni_findings": 2,
       "bandit_flagged": false,
       "bandit_issues": 0
@@ -96,7 +96,7 @@
       "label": "VULNERABLE",
       "cwe": "CWE-502 (Deserialization), CWE-798 (Hardcoded Credentials)",
       "omni_flagged": true,
-      "omni_risk_score": 0.8662891891563456,
+      "omni_risk_score": 0.7450195143848676,
       "omni_findings": 10,
       "bandit_flagged": true,
       "bandit_issues": 3
@@ -106,7 +106,7 @@
       "label": "VULNERABLE",
       "cwe": "CWE-78 (OS Command Injection)",
       "omni_flagged": true,
-      "omni_risk_score": 0.9999973812470345,
+      "omni_risk_score": 0.9986726783562535,
       "omni_findings": 35,
       "bandit_flagged": true,
       "bandit_issues": 8
@@ -116,7 +116,7 @@
       "label": "BENIGN",
       "cwe": "\u2014",
       "omni_flagged": true,
-      "omni_risk_score": 0.998736317510722,
+      "omni_risk_score": 0.6245037685982318,
       "omni_findings": 3,
       "bandit_flagged": true,
       "bandit_issues": 5
@@ -125,8 +125,8 @@
       "file": "tests/benchmarks/dataset/downloaded/anthropics_skills/skills/docx/scripts/office/pack.py",
       "label": "BENIGN",
       "cwe": "\u2014",
-      "omni_flagged": true,
-      "omni_risk_score": 0.9996134804266742,
+      "omni_flagged": false,
+      "omni_risk_score": 0.3598656521123075,
       "omni_findings": 2,
       "bandit_flagged": false,
       "bandit_issues": 0
@@ -136,7 +136,7 @@
       "label": "BENIGN",
       "cwe": "\u2014",
       "omni_flagged": true,
-      "omni_risk_score": 0.846033332037325,
+      "omni_risk_score": 0.4590443529170991,
       "omni_findings": 2,
       "bandit_flagged": false,
       "bandit_issues": 4
@@ -145,8 +145,8 @@
       "file": "tests/benchmarks/dataset/downloaded/anthropics_skills/skills/pdf/scripts/check_bounding_boxes.py",
       "label": "BENIGN",
       "cwe": "\u2014",
-      "omni_flagged": true,
-      "omni_risk_score": 0.9999268617268728,
+      "omni_flagged": false,
+      "omni_risk_score": 0.30582535646320175,
       "omni_findings": 1,
       "bandit_flagged": false,
       "bandit_issues": 0
@@ -155,8 +155,8 @@
       "file": "tests/benchmarks/dataset/downloaded/anthropics_skills/skills/pdf/scripts/convert_pdf_to_images.py",
       "label": "BENIGN",
       "cwe": "\u2014",
-      "omni_flagged": true,
-      "omni_risk_score": 0.8762521298277157,
+      "omni_flagged": false,
+      "omni_risk_score": 0.19159340609985182,
       "omni_findings": 1,
       "bandit_flagged": false,
       "bandit_issues": 0
@@ -165,8 +165,8 @@
       "file": "tests/benchmarks/dataset/downloaded/anthropics_skills/skills/pptx/scripts/add_slide.py",
       "label": "BENIGN",
       "cwe": "\u2014",
-      "omni_flagged": true,
-      "omni_risk_score": 0.9372137012808219,
+      "omni_flagged": false,
+      "omni_risk_score": 0.2778394886056753,
       "omni_findings": 2,
       "bandit_flagged": false,
       "bandit_issues": 0
@@ -176,7 +176,7 @@
       "label": "BENIGN",
       "cwe": "\u2014",
       "omni_flagged": true,
-      "omni_risk_score": 0.9750277636682373,
+      "omni_risk_score": 0.5307208378208987,
       "omni_findings": 2,
       "bandit_flagged": false,
       "bandit_issues": 5
@@ -185,8 +185,8 @@
       "file": "tests/benchmarks/dataset/downloaded/anthropics_skills/skills/skill-creator/scripts/aggregate_benchmark.py",
       "label": "BENIGN",
       "cwe": "\u2014",
-      "omni_flagged": true,
-      "omni_risk_score": 0.9999985004278715,
+      "omni_flagged": false,
+      "omni_risk_score": 0.5343101017079954,
       "omni_findings": 5,
       "bandit_flagged": false,
       "bandit_issues": 0
@@ -195,8 +195,8 @@
       "file": "tests/benchmarks/dataset/downloaded/anthropics_skills/skills/skill-creator/scripts/generate_report.py",
       "label": "BENIGN",
       "cwe": "\u2014",
-      "omni_flagged": true,
-      "omni_risk_score": 0.9981282069669453,
+      "omni_flagged": false,
+      "omni_risk_score": 0.34961641869533183,
       "omni_findings": 2,
       "bandit_flagged": false,
       "bandit_issues": 0
@@ -205,8 +205,8 @@
       "file": "src/engine/analyzer.py",
       "label": "BENIGN",
       "cwe": "\u2014",
-      "omni_flagged": true,
-      "omni_risk_score": 0.9999610610178347,
+      "omni_flagged": false,
+      "omni_risk_score": 0.5317791158387286,
       "omni_findings": 5,
       "bandit_flagged": false,
       "bandit_issues": 0
@@ -215,8 +215,8 @@
       "file": "src/engine/security.py",
       "label": "BENIGN",
       "cwe": "\u2014",
-      "omni_flagged": true,
-      "omni_risk_score": 0.9516035798891866,
+      "omni_flagged": false,
+      "omni_risk_score": 0.6259240598468268,
       "omni_findings": 9,
       "bandit_flagged": false,
       "bandit_issues": 0
@@ -225,8 +225,8 @@
       "file": "src/engine/baseline.py",
       "label": "BENIGN",
       "cwe": "\u2014",
-      "omni_flagged": true,
-      "omni_risk_score": 0.8020165058963296,
+      "omni_flagged": false,
+      "omni_risk_score": 0.5223775661565006,
       "omni_findings": 8,
       "bandit_flagged": false,
       "bandit_issues": 0
@@ -235,8 +235,8 @@
       "file": "src/engine/diff.py",
       "label": "BENIGN",
       "cwe": "\u2014",
-      "omni_flagged": true,
-      "omni_risk_score": 0.996417757769074,
+      "omni_flagged": false,
+      "omni_risk_score": 0.2732747310612087,
       "omni_findings": 0,
       "bandit_flagged": false,
       "bandit_issues": 0
@@ -245,8 +245,8 @@
       "file": "src/engine/validator.py",
       "label": "BENIGN",
       "cwe": "\u2014",
-      "omni_flagged": true,
-      "omni_risk_score": 0.9413377797265885,
+      "omni_flagged": false,
+      "omni_risk_score": 0.20705786913975963,
       "omni_findings": 0,
       "bandit_flagged": false,
       "bandit_issues": 0
@@ -255,22 +255,22 @@
       "file": "tests/test_analyzer.py",
       "label": "BENIGN",
       "cwe": "\u2014",
-      "omni_flagged": true,
-      "omni_risk_score": 0.5916493668999642,
+      "omni_flagged": false,
+      "omni_risk_score": 0.09550067617723497,
       "omni_findings": 0,
       "bandit_flagged": false,
       "bandit_issues": 0
     }
   ],
   "omni_auditor": {
-    "TP": 10,
-    "FP": 15,
-    "FN": 1,
-    "TN": 0,
-    "Precision": 0.4,
-    "Recall": 0.9090909090909091,
-    "F1": 0.5555555555555556,
-    "Accuracy": 0.38461538461538464
+    "TP": 7,
+    "FP": 3,
+    "FN": 4,
+    "TN": 12,
+    "Precision": 0.7,
+    "Recall": 0.6363636363636364,
+    "F1": 0.6666666666666666,
+    "Accuracy": 0.7307692307692307
   },
   "bandit": {
     "TP": 6,
@@ -283,9 +283,6 @@
     "Accuracy": 0.7692307692307693
   },
   "omni_cwes_detected": [
-    "CWE-1336 (SSTI)",
-    "CWE-1336 (SSTI), CWE-22 (Path Traversal)",
-    "CWE-22 (Path Traversal), CWE-94 (Code Injection)",
     "CWE-502 (Deserialization)",
     "CWE-502 (Deserialization), CWE-798 (Hardcoded Credentials)",
     "CWE-78 (OS Command Injection)",
