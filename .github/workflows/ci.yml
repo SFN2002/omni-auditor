@@ -39,8 +39,10 @@ jobs:
       # Threshold set to 75% (not 85%) because UI/Rich console code is
       # difficult to validate in a headless CI environment.
       - name: Run tests with coverage
+        env:
+          PYTHONPATH: ${{ github.workspace }}
         run: |
-          pip install pytest pytest-cov
+          pip install -e .
           pytest --cov=src --cov-report=xml --cov-report=term-missing --cov-fail-under=75
 
       - name: Compile VS Code extension
