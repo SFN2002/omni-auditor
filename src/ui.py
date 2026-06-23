@@ -530,7 +530,10 @@ def _print_delta_report(delta: DeltaReport) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _print_post_run_summary(report: FinalReport) -> None:
+def _print_post_run_summary(
+    report: FinalReport,
+    exit_code: int | None = None,
+) -> None:
     """Static post-run summary (after Live context has exited)."""
     console = Console()
     console.print()
@@ -541,3 +544,13 @@ def _print_post_run_summary(report: FinalReport) -> None:
         f"Threats      : {report.security.total_threats} "
         f"({report.security.severity_counts.get('CRITICAL', 0)} critical)"
     )
+    if exit_code is not None:
+        meaning = {
+            0: "success",
+            1: "HIGH-risk findings detected",
+            2: "CRITICAL-risk findings detected",
+        }.get(exit_code, "unknown")
+        console.print(
+            f"Exit Code    : [bold]{exit_code}[/bold] — {meaning} "
+            "(0=LOW/MEDIUM, 1=HIGH, 2=CRITICAL)"
+        )

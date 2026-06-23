@@ -23,6 +23,18 @@ outputs:
   sarif-path:
     description: "Absolute path to the generated SARIF file."
     value: ${{ steps.analysis.outputs.sarif-path }}
+  risk-tier:
+    description: "Highest risk tier observed across scanned files (LOW, MEDIUM, HIGH, or CRITICAL)."
+    value: ${{ steps.analysis.outputs.risk-tier }}
+  finding-count:
+    description: "Total number of SARIF results produced."
+    value: ${{ steps.analysis.outputs.finding-count }}
+  critical-count:
+    description: "Number of CRITICAL severity findings."
+    value: ${{ steps.analysis.outputs.critical-count }}
+  high-count:
+    description: "Number of HIGH severity findings."
+    value: ${{ steps.analysis.outputs.high-count }}
 
 runs:
   using: "composite"
@@ -67,19 +79,28 @@ runs:
                 )
             ]
 
+        TIER_RANK = {"LOW": 0, "MEDIUM": 1, "HIGH": 2, "CRITICAL": 3}
+        EMPTY_SARIF = {
+            "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+            "version": "2.1.0",
+            "runs": [{
+                "tool": {"driver": {"name": "Omni-Auditor", "version": "0.1.0"}},
+                "results": [],
+            }]
+        }
+
         if not files:
-            empty_sarif = {
-                "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
-                "version": "2.1.0",
-                "runs": [{
-                    "tool": {"driver": {"name": "Omni-Auditor", "version": "0.1.0"}},
-                    "results": [],
-                }]
-            }
-            out_path.write_text(json.dumps(empty_sarif, indent=2), encoding="utf-8")
+            out_path.write_text(json.dumps(EMPTY_SARIF, indent=2), encoding="utf-8")
             print(f"No Python files found in {scan_path}")
-        else:
+            risk_tier = "LOW"
             all_results = []
+        else:
+            print(f"::notice::Omni-Auditor scanning {len(files)} Python file(s) under {scan_path}")
+            all_results = []
+            file_reports = []
+            worst_tier = "LOW"
+            per_file_summaries = []
+
             for f in files:
                 code = f.read_text(encoding="utf-8")
                 auditor = OmniAuditor(
@@ -89,8 +110,19 @@ runs:
                     critical_threshold=threshold,
                 )
                 report = asyncio.run(auditor.run())
+                file_reports.append(report)
                 sarif = export_sarif(report, file_path=str(f))
-                all_results.extend(sarif["runs"][0]["results"])
+                file_results = sarif["runs"][0]["results"]
+                all_results.extend(file_results)
+
+                # Track worst tier and per-file summary.
+                file_tier = report.risk_tier
+                if TIER_RANK.get(file_tier, 0) > TIER_RANK.get(worst_tier, 0):
+                    worst_tier = file_tier
+                file_findings = len(file_results)
+                per_file_summaries.append(
+                    f"  • {f}: {file_tier} (score={report.unified_risk_score:.4f}, findings={file_findings})"
+                )
 
                 if baseline_id:
                     baseline_mgr = BaselineManager()
@@ -133,10 +165,41 @@ runs:
                 }]
             }
             out_path.write_text(json.dumps(merged, indent=2), encoding="utf-8")
+            risk_tier = worst_tier
+
+            print("::group::Omni-Auditor per-file summary")
+            for line in per_file_summaries:
+                print(line)
+            print("::endgroup::")
+
+        # Aggregate severity counts from the live reports (security findings are
+        # mapped to SARIF levels, so we use the original severity to keep
+        # critical/high counts accurate).
+        total_findings = len(all_results)
+        severity_counts = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0}
+        for report in file_reports:
+            for sev, count in report.security.severity_counts.items():
+                severity_counts[sev] = severity_counts.get(sev, 0) + count
+
+        critical_count = severity_counts["CRITICAL"]
+        high_count = severity_counts["HIGH"]
+
+        print(f"::notice::Omni-Auditor SARIF output written to {out_path}")
+        print(f"::notice::Omni-Auditor summary: tier={risk_tier}, total_findings={total_findings}, "
+              f"critical={critical_count}, high={high_count}, medium={severity_counts['MEDIUM']}, low={severity_counts['LOW']}")
+
+        if risk_tier == "CRITICAL":
+            print(f"::error::Omni-Auditor detected CRITICAL risk findings. Review the SARIF output.")
+        elif risk_tier == "HIGH":
+            print(f"::warning::Omni-Auditor detected HIGH risk findings. Review the SARIF output.")
 
         print(f"sarif-path={out_path}")
         gh_output = os.environ.get("GITHUB_OUTPUT")
         if gh_output:
             with open(gh_output, "a", encoding="utf-8") as fh:
                 fh.write(f"sarif-path={out_path}\n")
+                fh.write(f"risk-tier={risk_tier}\n")
+                fh.write(f"finding-count={total_findings}\n")
+                fh.write(f"critical-count={critical_count}\n")
+                fh.write(f"high-count={high_count}\n")
       shell: bash

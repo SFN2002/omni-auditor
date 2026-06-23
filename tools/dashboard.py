@@ -1,14 +1,18 @@
 """
 Omni-Auditor Spectral Analysis Dashboard
 ========================================
-Run:      streamlit run C:\smart-auditor\dashboard.py
+Run:      streamlit run tools/dashboard.py
 Requires: pip install streamlit plotly pandas
 Data:     Upload a JSON report from: omni-auditor file.py --json
+          Or pre-load a report: streamlit run tools/dashboard.py -- --report report.json
 """
 
 from __future__ import annotations
 
+import argparse
 import json
+import sys
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -674,9 +678,34 @@ class DashboardApp:
             self.render_ai_interpretation()
 
 
+def _parse_cli_args(argv: list[str]) -> argparse.Namespace:
+    """Parse optional CLI arguments, tolerating Streamlit's own flags."""
+    parser = argparse.ArgumentParser(
+        prog="dashboard",
+        description="Streamlit dashboard for Omni-Auditor JSON reports.",
+    )
+    parser.add_argument(
+        "--report",
+        "-r",
+        type=Path,
+        default=None,
+        help="Optional path to a pre-generated Omni-Auditor JSON report.",
+    )
+    # Streamlit passes extra flags; ignore unknown ones.
+    args, _ = parser.parse_known_args(argv[1:])
+    return args
+
+
 # ----------------------------------------------------------------------
 # Entry point
 # ----------------------------------------------------------------------
 if __name__ == "__main__":
+    cli_args = _parse_cli_args(sys.argv)
     app = DashboardApp()
+    if cli_args.report is not None:
+        try:
+            with open(cli_args.report, "r", encoding="utf-8") as f:
+                app.load_data(f)
+        except Exception as exc:  # pragma: no cover
+            st.error(f"Could not load report {cli_args.report}: {exc}")
     app.run()

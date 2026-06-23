@@ -1,0 +1,10 @@
+{
+  "id": "45266fc4fa074ad2cc67e3b128149f71",
+  "source": "https://github.com/snoopysecurity/Vulnerable-Code-Snippets/blob/master/Server Side Template Injection/asis_ssti_pt.py",
+  "cache_path": "cache\\45266fc4fa074ad2cc67e3b128149f71.py",
+  "label": "VULNERABLE",
+  "owner": "snoopysecurity",
+  "repo": "Vulnerable-Code-Snippets",
+  "path": "Server Side Template Injection/asis_ssti_pt.py",
+  "size": 1770
+}

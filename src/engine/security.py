@@ -256,6 +256,9 @@ class SQLInjectionScanner:
 
         @staticmethod
         def _is_dynamic_sql(node: ast.expr) -> bool:
+            # f-strings are represented as ast.JoinedStr; the interpolated
+            # ast.FormattedValue children are the source of taint, so flagging
+            # the parent JoinedStr is sufficient to catch f-string SQLi.
             if isinstance(node, ast.JoinedStr):
                 return True
             if isinstance(node, ast.BinOp) and isinstance(

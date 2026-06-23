@@ -17,7 +17,12 @@ from rich.panel import Panel
 
 try:
     from .engine.analyzer import Analyzer, StructuralAnalysisResult
-    from .engine.validator import StatisticalValidator, ValidationResult, ModuleAnomalyReport
+    from .engine.validator import (
+        ModuleAnomalyReport,
+        PopulationValidator,
+        StatisticalValidator,
+        ValidationResult,
+    )
     from .engine.security import SafetyGuard, SecurityReport
     from .engine.baseline import BaselineManager, build_spectral_snapshot
     from .engine.diff import SpectralDiffEngine, DeltaReport
@@ -26,7 +31,12 @@ try:
     from .ui import RichUIRenderer, _print_delta_report, _print_post_run_summary
 except ImportError:  # pragma: no cover
     from engine.analyzer import Analyzer, StructuralAnalysisResult
-    from engine.validator import StatisticalValidator, ValidationResult, ModuleAnomalyReport
+    from engine.validator import (
+        ModuleAnomalyReport,
+        PopulationValidator,
+        StatisticalValidator,
+        ValidationResult,
+    )
     from engine.security import SafetyGuard, SecurityReport
     from engine.baseline import BaselineManager, build_spectral_snapshot
     from engine.diff import SpectralDiffEngine, DeltaReport
@@ -35,6 +45,30 @@ except ImportError:  # pragma: no cover
     from ui import RichUIRenderer, _print_delta_report, _print_post_run_summary
 
 logger = logging.getLogger("omni_auditor")
+
+
+def _tier_exit_code(tier: str) -> int:
+    """Map a risk tier to a process exit code for CI/CLI scripting.
+
+    * LOW / MEDIUM → 0 (success)
+    * HIGH         → 1 (soft failure)
+    * CRITICAL     → 2 (hard failure)
+    """
+    if tier == "CRITICAL":
+        return 2
+    if tier == "HIGH":
+        return 1
+    return 0
+
+
+def _exit_code_note(tier: str, code: int) -> str:
+    """Return a human-readable note explaining the process exit code."""
+    meaning = {
+        0: "success",
+        1: "HIGH-risk findings detected",
+        2: "CRITICAL-risk findings detected",
+    }.get(code, "unknown")
+    return f"Exiting with code {code} ({meaning}) for risk tier {tier}."
 
 
 # ---------------------------------------------------------------------------
@@ -52,10 +86,30 @@ class AnalysisPipeline:
         Validator(analysis_result)
     """
 
-    def __init__(self, source_code: str, anomaly_threshold: float = 1.5, skip_validator: bool = False) -> None:
+    def __init__(
+        self,
+        source_code: str,
+        anomaly_threshold: float = 1.5,
+        skip_validator: bool | None = None,
+        population_dir: str | Path = ".omni_cache/population",
+    ) -> None:
         self.source_code: str = source_code
         self.anomaly_threshold: float = anomaly_threshold
-        self.skip_validator: bool = skip_validator
+        self.population_dir: Path = Path(population_dir)
+
+        # Auto-detect whether a statistical population is available.  When
+        # *skip_validator* is left as None we treat a missing or too-small
+        # population as an intentional security-only run rather than a failure.
+        if skip_validator is True:
+            self.skip_validator: bool = True
+        elif skip_validator is False:
+            self.skip_validator = False
+        else:
+            population_path = self.population_dir
+            population_files = (
+                list(population_path.rglob("*.py")) if population_path.exists() else []
+            )
+            self.skip_validator = len(population_files) <= 50
 
     # -- internal CPU-bound runners ----------------------------------------
 
@@ -63,25 +117,46 @@ class AnalysisPipeline:
         return Analyzer(self.source_code).analyze()
 
     def _run_validator(self, analysis: StructuralAnalysisResult) -> ValidationResult:
+        empty_module = ModuleAnomalyReport(
+            mahalanobis_distance=0.0,
+            renyi_entropy_discrete=0.0,
+            renyi_entropy_differential=0.0,
+            renyi_z_score=0.0,
+            anomaly_score=0.0,
+        )
+        empty_result = ValidationResult(
+            module_report=empty_module,
+            function_reports={},
+            aggregate_anomaly_vector=np.zeros(16, dtype=np.float64),
+            population_feature_matrix=np.zeros((0, 0), dtype=np.float64),
+            population_keys=[],
+            covariance_matrix=np.zeros((0, 0), dtype=np.float64),
+            precision_matrix=np.zeros((0, 0), dtype=np.float64),
+            anomaly_threshold=self.anomaly_threshold,
+        )
         if self.skip_validator:
-            empty_module = ModuleAnomalyReport(
-                mahalanobis_distance=0.0,
-                renyi_entropy_discrete=0.0,
-                renyi_entropy_differential=0.0,
-                renyi_z_score=0.0,
-                anomaly_score=0.0,
+            logger.info(
+                "Spectral validator disabled; running in security-only mode."
             )
-            return ValidationResult(
-                module_report=empty_module,
-                function_reports={},
-                aggregate_anomaly_vector=np.zeros(16, dtype=np.float64),
-                population_feature_matrix=np.zeros((0, 0), dtype=np.float64),
-                population_keys=[],
-                covariance_matrix=np.zeros((0, 0), dtype=np.float64),
-                precision_matrix=np.zeros((0, 0), dtype=np.float64),
-                anomaly_threshold=self.anomaly_threshold,
+            return empty_result
+
+        # Prefer real population-based validation when a large enough population
+        # directory is available.  The missing/too-small case is handled up front
+        # by auto-detecting skip_validator, so this fallback is for unexpected
+        # errors only (e.g., cache corruption, removed files between init and run).
+        try:
+            validator = PopulationValidator(
+                population_dir=self.population_dir,
+                min_population_size=50,
             )
-        return StatisticalValidator(analysis, anomaly_threshold=self.anomaly_threshold).validate()
+            return validator.validate(analysis, anomaly_threshold=self.anomaly_threshold)
+        except (FileNotFoundError, ValueError) as exc:
+            logger.warning(
+                "Population validation unavailable due to unexpected issue: %s. "
+                "Falling back to security-only mode.",
+                exc,
+            )
+            return empty_result
 
     def _run_security(self) -> SecurityReport:
         return SafetyGuard(self.source_code).scan()
@@ -122,17 +197,39 @@ class OmniAuditor:
         no_ui: bool = False,
         critical_threshold: float = 0.7,
         anomaly_threshold: float = 1.5,
+        population_dir: str | Path = ".omni_cache/population",
     ) -> None:
         self.source_code: str = source_code
         self.file_path: str | None = file_path
         self.no_ui: bool = no_ui
         self.critical_threshold: float = critical_threshold
-        baseline_mgr = BaselineManager()
-        has_baseline = any(baseline_mgr.baseline_dir.glob("*.json"))
+
+        # The statistical validator needs a diverse population of files, not a
+        # single-file spectral snapshot (which is what baselines are for).
+        population_path = Path(population_dir)
+        population_files = list(population_path.rglob("*.py")) if population_path.exists() else []
+        has_population = len(population_files) > 50
+        skip_validator = not has_population
+        if skip_validator:
+            if population_path.exists() and len(population_files) > 0:
+                logger.info(
+                    "Population directory %s contains only %d Python files (minimum 50). "
+                    "Spectral validator disabled by design; running in security-only mode. "
+                    "Provide a larger --population DIR for structural anomaly detection.",
+                    population_path,
+                    len(population_files),
+                )
+            else:
+                logger.info(
+                    "Running in security-only mode. "
+                    "Provide --population DIR for structural anomaly detection."
+                )
+
         self.pipeline = AnalysisPipeline(
             source_code,
             anomaly_threshold=anomaly_threshold,
-            skip_validator=not has_baseline,
+            skip_validator=skip_validator,
+            population_dir=population_path,
         )
         if not no_ui:
             self.renderer = RichUIRenderer(file_path=file_path, anomaly_threshold=anomaly_threshold)
@@ -167,11 +264,12 @@ class OmniAuditor:
         if self.pipeline.skip_validator:
             Console().print(
                 Panel(
-                    "No baseline found — spectral validator disabled.\n"
-                    "Run with --save-baseline first for full drift analysis.\n"
-                    "Security scanner is still active.",
-                    title="[yellow]Warning[/yellow]",
-                    border_style="yellow",
+                    "Spectral validator is disabled by design because no statistical "
+                    "population is configured or the provided directory is too small.\n"
+                    "Provide --population DIR with > 50 Python files for structural anomaly detection.\n"
+                    "Running in security-only mode.",
+                    title="[blue]Info[/blue]",
+                    border_style="blue",
                 )
             )
 
@@ -258,6 +356,11 @@ def main() -> None:
         help="Skip the Rich UI and emit a compact JSON report to stdout.",
     )
     parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Suppress all Rich output. Emit a minimal one-line summary unless --json is used.",
+    )
+    parser.add_argument(
         "--threshold",
         type=float,
         default=0.7,
@@ -286,6 +389,12 @@ def main() -> None:
         default=1.5,
         help="Z-score threshold for flagging structural anomalies (default: 1.5).",
     )
+    parser.add_argument(
+        "--population",
+        type=str,
+        default=None,
+        help="Directory of Python files used as a statistical population for structural anomaly detection.",
+    )
     args = parser.parse_args()
 
     source_path = Path(args.file)
@@ -303,9 +412,10 @@ def main() -> None:
     auditor = OmniAuditor(
         source_code,
         file_path=str(source_path.resolve()),
-        no_ui=args.json,
+        no_ui=args.json or args.quiet,
         critical_threshold=args.threshold,
         anomaly_threshold=args.anomaly_threshold,
+        population_dir=args.population if args.population else ".omni_cache/population",
     )
     try:
         final_report = asyncio.run(auditor.run())
@@ -328,13 +438,15 @@ def main() -> None:
             final_report=final_report,
         )
         baseline_mgr.save(args.save_baseline, snapshot)
-        console = Console()
-        console.print(
-            f"[bold green]Baseline saved for project '[/bold green]"
-            f"[bold cyan]{args.save_baseline}[/bold cyan]"
-            f"[bold green]'.[/bold green]"
-        )
+        if not args.json and not args.quiet:
+            console = Console()
+            console.print(
+                f"[bold green]Baseline saved for project '[/bold green]"
+                f"[bold cyan]{args.save_baseline}[/bold cyan]"
+                f"[bold green]'.[/bold green]"
+            )
 
+    delta_report: DeltaReport | None = None
     if args.diff:
         try:
             baseline_data = baseline_mgr.load(args.diff)
@@ -355,10 +467,13 @@ def main() -> None:
 
         if args.json:
             exporter = JSONExporter()
+            exit_code = _tier_exit_code(final_report.risk_tier)
             payload = {
                 "file_path": str(source_path.resolve()),
                 "unified_risk_score": final_report.unified_risk_score,
                 "risk_tier": final_report.risk_tier,
+                "exit_code": exit_code,
+                "exit_code_note": _exit_code_note(final_report.risk_tier, exit_code),
                 "fusion_weights": exporter.convert(final_report.fusion_weights),
                 "per_function_metrics": [
                     exporter.convert(dataclasses.asdict(fr))
@@ -377,20 +492,24 @@ def main() -> None:
                 },
             }
             print(json.dumps(payload, separators=(",", ":")))
-            return
+            sys.exit(exit_code)
 
-        _print_delta_report(delta_report)
-        # Fall through to the normal post-run summary so the user sees both.
+        if not args.quiet:
+            _print_delta_report(delta_report)
+            # Fall through to the normal post-run summary so the user sees both.
 
-    if args.verbose:
+    if args.verbose and not args.quiet:
         _print_verbose_metrics(final_report)
 
-    if args.json and not args.diff:
+    if args.json:
         exporter = JSONExporter()
+        exit_code = _tier_exit_code(final_report.risk_tier)
         payload = {
             "file_path": str(source_path.resolve()),
             "unified_risk_score": final_report.unified_risk_score,
             "risk_tier": final_report.risk_tier,
+            "exit_code": exit_code,
+            "exit_code_note": _exit_code_note(final_report.risk_tier, exit_code),
             "fusion_weights": exporter.convert(final_report.fusion_weights),
             "per_function_metrics": [
                 exporter.convert(dataclasses.asdict(fr))
@@ -409,6 +528,17 @@ def main() -> None:
                 json.dump(payload, f, indent=2, ensure_ascii=False)
         except Exception as exc:  # pragma: no cover
             logger.warning("Could not write output.json: %s", exc)
-        return
+        sys.exit(exit_code)
 
-    _print_post_run_summary(final_report)
+    if args.quiet:
+        exit_code = _tier_exit_code(final_report.risk_tier)
+        print(
+            f"{source_path}: {final_report.risk_tier} "
+            f"(score: {final_report.unified_risk_score:.2f}) "
+            f"{_exit_code_note(final_report.risk_tier, exit_code)}"
+        )
+        sys.exit(exit_code)
+
+    exit_code = _tier_exit_code(final_report.risk_tier)
+    _print_post_run_summary(final_report, exit_code=exit_code)
+    sys.exit(exit_code)

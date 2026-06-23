@@ -35,8 +35,12 @@ All public interfaces are strictly typed (``from __future__ import annotations``
 
 from __future__ import annotations
 
+import hashlib
+import json
+import logging
 import warnings
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -44,9 +48,11 @@ from numpy.typing import NDArray
 from scipy.linalg import cho_factor, cho_solve
 
 try:
-    from .analyzer import SpectralProfile, StructuralAnalysisResult
+    from .analyzer import Analyzer, SpectralProfile, StructuralAnalysisResult
 except ImportError:  # pragma: no cover
-    from analyzer import SpectralProfile, StructuralAnalysisResult
+    from analyzer import Analyzer, SpectralProfile, StructuralAnalysisResult
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -109,6 +115,15 @@ class ValidationResult:
 class CovarianceEstimator:
     """Sample covariance with condition-number-aware Tikhonov regularisation.
 
+    Fallbacks
+    ---------
+    * Fewer than 2 samples: raises ``ValueError`` — covariance is undefined.
+    * ``N < D`` (under-sampled): logs a warning and returns a diagonal
+      covariance matrix containing only the per-feature variances.  This is
+      mathematically valid and avoids an invalid full-rank estimate.
+    * NaN/Inf entries in the empirical covariance: raises ``RuntimeError``
+      so callers do not silently propagate numerical garbage.
+
     When the population is small (cold-start) or the feature dimension is
     large relative to the sample count, the empirical covariance is singular
     or near-singular.  This estimator automatically inflates the diagonal by
@@ -136,10 +151,27 @@ class CovarianceEstimator:
     # -- internal machinery ------------------------------------------------
 
     def _compute_covariance(self) -> NDArray[np.float64]:
-        if self.n < 2 or self.d == 0:
-            return np.zeros((self.d, self.d), dtype=np.float64)
+        if self.n < 2:
+            raise ValueError("Need at least 2 samples for covariance")
+        if self.d == 0:
+            return np.zeros((0, 0), dtype=np.float64)
+
+        if self.n < self.d:
+            logger.warning(
+                "Population under-sampled (N=%d < D=%d); using diagonal-only covariance.",
+                self.n,
+                self.d,
+            )
+            variances = np.var(self.X, axis=0, ddof=1)
+            return np.diag(variances)
+
         Xc = self.X - self.mean
-        return (Xc.T @ Xc) / (self.n - 1)
+        cov = (Xc.T @ Xc) / (self.n - 1)
+
+        if not np.all(np.isfinite(cov)):
+            raise RuntimeError("Covariance matrix contains NaN or Inf values")
+
+        return cov
 
     def _regularize(self, Sigma: NDArray[np.float64]) -> NDArray[np.float64]:
         if self.d == 0:
@@ -343,6 +375,12 @@ class StatisticalValidator:
     """
 
     def __init__(self, analysis: StructuralAnalysisResult, anomaly_threshold: float = 1.5) -> None:
+        warnings.warn(
+            "StatisticalValidator is deprecated and will be removed in a future release. "
+            "Use PopulationValidator for real population-based anomaly detection.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self.analysis: StructuralAnalysisResult = analysis
         self.anomaly_threshold: float = anomaly_threshold
         self._population_keys: list[str] = []
@@ -521,6 +559,180 @@ class StatisticalValidator:
 
 
 # ---------------------------------------------------------------------------
+# Population-based validator
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class PopulationValidator:
+    """Real population-based structural anomaly detection.
+
+    Unlike :class:`StatisticalValidator`, which fabricates a population from a
+    single file's module and functions, this class builds a population from a
+    directory of Python files, fits a robust covariance model using
+    Ledoit-Wolf shrinkage, and scores new files via Mahalanobis distance.
+
+    Parameters
+    ----------
+    population_dir:
+        Directory containing representative Python source files.
+    min_population_size:
+        Minimum number of ``.py`` files required to fit the model.
+    cache_dir:
+        Directory where population statistics are cached.
+    """
+
+    population_dir: Path
+    min_population_size: int = 50
+    cache_dir: Path = Path(".omni_cache")
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "population_dir", Path(self.population_dir))
+        object.__setattr__(self, "cache_dir", Path(self.cache_dir))
+
+    @property
+    def _stats_path(self) -> Path:
+        return self.cache_dir / "population_stats.json"
+
+    @staticmethod
+    def _hash_file_list(paths: list[Path]) -> str:
+        """SHA256 digest of the sorted list of file paths."""
+        normalized = sorted(str(p) for p in paths)
+        payload = json.dumps(normalized, separators=(",", ":"), ensure_ascii=False)
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    def _build_population(self) -> NDArray[np.float64]:
+        """Recursively analyse all ``.py`` files and stack their 14-D module vectors."""
+        population_path = Path(self.population_dir)
+        if not population_path.exists():
+            raise FileNotFoundError(f"Population directory does not exist: {population_path}")
+
+        files = sorted(population_path.rglob("*.py"))
+        if len(files) < self.min_population_size:
+            raise ValueError(
+                f"Population too small: {len(files)} files (minimum {self.min_population_size})"
+            )
+
+        vectors: list[NDArray[np.float64]] = []
+        for path in files:
+            try:
+                source = path.read_text(encoding="utf-8")
+            except Exception as exc:  # pragma: no cover
+                logger.warning("Skipping population file %s: %s", path, exc)
+                continue
+            try:
+                analysis = Analyzer(source).analyze(use_cache=True)
+            except Exception as exc:  # pragma: no cover
+                logger.warning("Failed to analyse population file %s: %s", path, exc)
+                continue
+            vectors.append(analysis.module_spectral.feature_vector)
+
+        if len(vectors) < self.min_population_size:
+            raise ValueError(
+                f"Only {len(vectors)} valid module vectors extracted "
+                f"(minimum {self.min_population_size})"
+            )
+
+        return np.stack(vectors)
+
+    def fit(self) -> None:
+        """Fit the population model, loading from cache when the population is unchanged."""
+        from sklearn.covariance import LedoitWolf
+
+        population_files = sorted(Path(self.population_dir).rglob("*.py"))
+        current_hash = self._hash_file_list(population_files)
+
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        if self._stats_path.exists():
+            try:
+                with open(self._stats_path, "r", encoding="utf-8") as f:
+                    cached = json.load(f)
+                if cached.get("file_hash") == current_hash:
+                    object.__setattr__(self, "mean_", np.array(cached["mean"], dtype=np.float64))
+                    object.__setattr__(self, "covariance_", np.array(cached["covariance"], dtype=np.float64))
+                    object.__setattr__(self, "precision_", np.array(cached["precision"], dtype=np.float64))
+                    object.__setattr__(self, "population_", np.zeros((0, 0), dtype=np.float64))
+                    object.__setattr__(self, "file_hash_", current_hash)
+                    logger.info("Loaded population statistics from cache.")
+                    return
+            except Exception as exc:  # pragma: no cover
+                logger.warning("Population cache invalid, refitting: %s", exc)
+
+        population = self._build_population()
+        lw = LedoitWolf()
+        lw.fit(population)
+
+        object.__setattr__(self, "mean_", np.array(lw.location_, dtype=np.float64))
+        object.__setattr__(self, "covariance_", np.array(lw.covariance_, dtype=np.float64))
+        object.__setattr__(self, "precision_", np.linalg.pinv(self.covariance_))
+        object.__setattr__(self, "population_", population.copy())
+        object.__setattr__(self, "file_hash_", current_hash)
+
+        payload = {
+            "file_hash": current_hash,
+            "mean": self.mean_.tolist(),
+            "covariance": self.covariance_.tolist(),
+            "precision": self.precision_.tolist(),
+            "n_samples": int(population.shape[0]),
+            "n_features": int(population.shape[1]),
+        }
+        with open(self._stats_path, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2, ensure_ascii=False)
+        logger.info("Fitted and cached population statistics (%d files).", population.shape[0])
+
+    def score(self, file_vector: NDArray[np.float64]) -> float:
+        """Return the squared Mahalanobis distance of *file_vector* from the population.
+
+        The model must be fitted via :meth:`fit` before scoring.
+        """
+        if not hasattr(self, "mean_"):
+            raise RuntimeError("PopulationValidator must be fitted before scoring.")
+
+        diff = file_vector - self.mean_
+        return float(diff @ self.precision_ @ diff)
+
+    def validate(
+        self,
+        analysis: StructuralAnalysisResult,
+        anomaly_threshold: float = 1.5,
+    ) -> ValidationResult:
+        """Score *analysis* against the fitted population and return a ValidationResult."""
+        self.fit()
+        score = self.score(analysis.module_spectral.feature_vector)
+
+        module_report = ModuleAnomalyReport(
+            mahalanobis_distance=float(np.sqrt(score)),
+            renyi_entropy_discrete=0.0,
+            renyi_entropy_differential=0.0,
+            renyi_z_score=0.0,
+            anomaly_score=float(score),
+        )
+
+        # Population-level validator has no per-function reports.
+        base = np.array(
+            [
+                module_report.mahalanobis_distance,
+                module_report.renyi_entropy_discrete,
+                module_report.renyi_entropy_differential,
+                module_report.anomaly_score,
+            ],
+            dtype=np.float64,
+        )
+        aggregate = np.concatenate([base, np.zeros(12, dtype=np.float64)])
+
+        return ValidationResult(
+            module_report=module_report,
+            function_reports={},
+            aggregate_anomaly_vector=aggregate,
+            population_feature_matrix=getattr(self, "population_", np.zeros((0, 0))).copy(),
+            population_keys=[],
+            covariance_matrix=getattr(self, "covariance_", np.zeros((0, 0))).copy(),
+            precision_matrix=getattr(self, "precision_", np.zeros((0, 0))).copy(),
+            anomaly_threshold=anomaly_threshold,
+        )
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -529,6 +741,7 @@ __all__ = [
     "RenyiEntropyEstimator",
     "AnomalyScorer",
     "StatisticalValidator",
+    "PopulationValidator",
     "FunctionAnomalyReport",
     "ModuleAnomalyReport",
     "ValidationResult",

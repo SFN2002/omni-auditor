@@ -1,0 +1,10 @@
+{
+  "id": "b2549bd503a0ef1a6b8598fd90d7ecd0",
+  "source": "https://github.com/OWASP/Vulnerable-Web-Applications-Directory/blob/master/.github/workflows/scripts/check_editorconfig.py",
+  "cache_path": "cache\\b2549bd503a0ef1a6b8598fd90d7ecd0.py",
+  "label": "VULNERABLE",
+  "owner": "OWASP",
+  "repo": "Vulnerable-Web-Applications-Directory",
+  "path": ".github/workflows/scripts/check_editorconfig.py",
+  "size": 13711
+}

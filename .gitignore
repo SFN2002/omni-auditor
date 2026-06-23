@@ -38,6 +38,7 @@ vscode-extension/out/
 
 # Benchmark datasets
 tests/benchmarks/dataset/downloaded/
+benchmarks/data/
 
 *.egg
 

@@ -1,0 +1,10 @@
+{
+  "id": "6517fb9ec1fc7be6d14db3acea1d9508",
+  "source": "https://github.com/OWASP/Vulnerable-Web-Applications-Directory/blob/master/.github/workflows/scripts/check_schema.py",
+  "cache_path": "cache\\6517fb9ec1fc7be6d14db3acea1d9508.py",
+  "label": "VULNERABLE",
+  "owner": "OWASP",
+  "repo": "Vulnerable-Web-Applications-Directory",
+  "path": ".github/workflows/scripts/check_schema.py",
+  "size": 3063
+}

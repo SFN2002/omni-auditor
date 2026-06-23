@@ -1,0 +1,10 @@
+{
+  "id": "14245b0e8d8f2e86a1938b83e759d6a8",
+  "source": "https://github.com/snoopysecurity/Vulnerable-Code-Snippets/blob/master/Command Injection/tainted.py",
+  "cache_path": "cache\\14245b0e8d8f2e86a1938b83e759d6a8.py",
+  "label": "VULNERABLE",
+  "owner": "snoopysecurity",
+  "repo": "Vulnerable-Code-Snippets",
+  "path": "Command Injection/tainted.py",
+  "size": 303
+}

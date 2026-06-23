@@ -38,7 +38,7 @@ jobs:
 
       # Threshold set to 75% (not 85%) because UI/Rich console code is
       # difficult to validate in a headless CI environment.
-      - name: Run tests with coverage
+      - name: Run unit and integration tests with coverage
         env:
           PYTHONPATH: ${{ github.workspace }}
         run: |

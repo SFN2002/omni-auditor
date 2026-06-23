@@ -1,0 +1,10 @@
+{
+  "id": "1b407486decafc10a60629d7f3475e65",
+  "source": "https://github.com/snoopysecurity/Vulnerable-Code-Snippets/blob/master/Unsafe Deserialization/pickle2.py",
+  "cache_path": "cache\\1b407486decafc10a60629d7f3475e65.py",
+  "label": "VULNERABLE",
+  "owner": "snoopysecurity",
+  "repo": "Vulnerable-Code-Snippets",
+  "path": "Unsafe Deserialization/pickle2.py",
+  "size": 5390
+}

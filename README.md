@@ -76,7 +76,7 @@ Omni-Auditor is built around four engine subsystems orchestrated by an async pip
 | **Security** | `src/engine/security.py` | AST-based vulnerability scanning: SQL injection, path traversal, hardcoded secrets, dangerous calls, unsafe deserialization, dynamic execution. Produces an 18-D threat vector. |
 | **Diff** | `src/engine/diff.py` | Spectral drift detection between baselines: Laplacian Frobenius distance, eigenvalue KL drift, Fiedler vector shift, modularity delta, security delta. |
 
-The **FusionEngine** adaptively weights the three vectors (56-D + 16-D + 18-D = 90-D) based on security severity, then computes a unified risk score in `[0, 1]` with tier `LOW | MEDIUM | HIGH | CRITICAL`.
+The **FusionEngine** adaptively weights the active vectors based on security severity, then computes a unified risk score in `[0, 1]` with tier `LOW | MEDIUM | HIGH | CRITICAL`. In security-only mode (the default when no `--population` is supplied), the 16-D anomaly vector is dropped and the score is computed from the structural and security vectors only.
 
 ---
 
@@ -86,11 +86,29 @@ The **FusionEngine** adaptively weights the three vectors (56-D + 16-D + 18-D = 
 |------|-------------|
 | `file` | Path to the Python source file to analyse (required). |
 | `--json` | Skip the Rich UI and emit a compact JSON report to stdout. |
+| `--quiet` | Suppress all Rich output; emit a minimal one-line summary (or JSON when combined with `--json`). |
 | `--verbose` | Print detailed per-function spectral metrics before the final report. |
 | `--threshold FLOAT` | Override the CRITICAL risk tier threshold (default: `0.7`). |
 | `--save-baseline ID` | Persist the current analysis snapshot as a baseline under the given project ID. |
 | `--diff ID` | Load a saved baseline and compute structural drift against the current file. |
 | `--anomaly-threshold FLOAT` | Z-score threshold for flagging structural anomalies (default: `1.5`). |
+| `--population DIR` | Directory of Python files for statistical population-based anomaly detection (requires > 50 files). |
+
+### Exit codes
+
+The CLI returns a process exit code based on the highest risk tier detected. This makes it easy to use Omni-Auditor in CI/CD pipelines:
+
+| Exit code | Meaning | When it happens |
+|-----------|---------|-----------------|
+| `0` | Success | Risk tier is `LOW` or `MEDIUM`. No action required. |
+| `1` | Soft failure | Risk tier is `HIGH`. Review recommended. |
+| `2` | Hard failure | Risk tier is `CRITICAL`. Immediate review required. |
+
+In `--quiet` and `--json` modes, and in the Rich post-run summary, the exit code is printed alongside a short explanation so it is never a surprise.
+
+### Security-only mode
+
+By default, Omni-Auditor runs in **security-only mode**: the security scanner and structural analyser are always active, but the statistical validator is skipped unless `--population` is provided with a directory containing more than 50 Python files. This is intentional and eliminates cold-start false positives from an under-sampled population. When this happens you will see an informational message, not an error.
 
 ---
 
@@ -184,6 +202,16 @@ jobs:
 | `path` | `.` | Python file or directory to scan. |
 | `threshold` | `0.7` | CRITICAL risk tier threshold. |
 | `diff-baseline` | `""` | Optional baseline project ID for drift detection. |
+
+| Output | Description |
+|--------|-------------|
+| `sarif-path` | Absolute path to the generated SARIF file. |
+| `risk-tier` | Highest risk tier observed (`LOW`, `MEDIUM`, `HIGH`, or `CRITICAL`). |
+| `finding-count` | Total number of SARIF results produced. |
+| `critical-count` | Number of CRITICAL severity findings. |
+| `high-count` | Number of HIGH severity findings. |
+
+The action also prints a concise summary in the workflow logs and emits `::notice::`, `::warning::`, or `::error::` annotations based on the highest risk tier.
 
 ---
 

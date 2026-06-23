@@ -46,9 +46,36 @@ class FinalReport:
 class FusionEngine:
     """Adaptive fusion of spectral, statistical, and security signals.
 
+    Inputs
+    ------
+    * ``analysis.aggregate_feature_vector`` — 56-D structural descriptor built
+      from the module CFG plus aggregate function statistics (mean / max / std).
+    * ``validation.aggregate_anomaly_vector`` — 16-D multivariate anomaly
+      descriptor from the statistical validator (Mahalanobis + Rényi entropies).
+    * ``security.feature_vector`` — 18-D categorical threat descriptor from the
+      security scanner.
+
+    Outputs
+    -------
+    A :class:`FinalReport` containing a unified risk score in ``[0, 1]`` and a
+    discrete risk tier in ``{LOW, MEDIUM, HIGH, CRITICAL}``.
+
+    Fusion philosophy
+    -----------------
+    Fixed weights are brittle: a clean file with one dangerous call would be
+    drowned out by structural noise, while a trivial file with a critical
+    vulnerability must surface immediately.  We therefore make the weights
+    *severity-adaptive*.  When no security threats are present the three
+    subsystems share weight roughly equally, letting structural anomalies
+    dominate.  As severity rises, the security branch is up-weighted
+    monotonically so that high-confidence threats cannot be masked by benign
+    structure.  The validator is dropped (weight 0.0) when no population is
+    available, and its share is redistributed to structure and security.
+
     The engine extracts the fixed-dimension vectors from each subsystem,
-    applies domain-specific adaptive weights, concatenates the weighted
-    components, and synthesises a unified risk score in ``[0, 1]``.
+    applies the adaptive weights, concatenates the weighted components into a
+    90-D fused feature vector, and synthesises the unified risk score through
+    two non-linear gating functions.
     """
 
     def __init__(
@@ -73,10 +100,57 @@ class FusionEngine:
             return padded
         return v[:expected]
 
+    def _pad_analysis_vector(self) -> NDArray[np.float64]:
+        """Ensure the structural vector is 56-D without degrading functionless files.
+
+        Files with no functions emit a 14-D module descriptor.  Rather than
+        padding the remaining 42 dimensions with zeros, we repeat the module
+        descriptor so the structural signal remains coherent.  This keeps the
+        56-D representation semantically meaningful and avoids the previous
+        "75% zeros" artefact that masked real structure from downstream scoring.
+        """
+        v = self.analysis.aggregate_feature_vector
+        expected = 56
+        if v.shape[0] >= expected:
+            return v[:expected]
+
+        module_vec = self.analysis.module_spectral.feature_vector
+        padded = np.zeros(expected, dtype=np.float64)
+        padded[: v.shape[0]] = v
+
+        # For the canonical functionless case (14-D module vector), repeat the
+        # module descriptor to fill the mean/max/std segments.
+        if v.shape[0] == module_vec.shape[0]:
+            segment = module_vec.shape[0]
+            for offset in range(v.shape[0], expected, segment):
+                end = min(offset + segment, expected)
+                padded[offset:end] = module_vec[: end - offset]
+        else:
+            # Fallback: pad any other short vector with the scalar module mean.
+            mean_val = float(np.mean(module_vec))
+            padded[v.shape[0] :] = mean_val
+
+        return padded
+
     def _compute_weights(self) -> tuple[float, float, float]:
+        """Return adaptive 3-tuple (w_analysis, w_validator, w_security).
+
+        The weights always sum to 1.0.  They are chosen from a severity ladder:
+
+        * CRITICAL findings present → (0.15, 0.25, 0.60)
+          Security dominates; structural signals provide context only.
+        * HIGH findings present (no CRITICAL) → (0.20, 0.30, 0.50)
+          Security still leads; validator gets a moderate share.
+        * Otherwise → (0.30, 0.35, 0.35)
+          Balanced tri-partite fusion when no severe threats are found.
+
+        If ``skip_validator`` is set, the caller overrides these by zeroing the
+        validator weight and re-normalising the remainder to (0.40, 0.60).
+        """
         critical = self.security.severity_counts.get("CRITICAL", 0)
         high = self.security.severity_counts.get("HIGH", 0)
 
+        # Escalate the security weight as severity increases.
         if critical > 0:
             return 0.15, 0.25, 0.60
         if high > 0:
@@ -86,7 +160,7 @@ class FusionEngine:
     # -- public entry ------------------------------------------------------
 
     def fuse(self, critical_threshold: float = 0.7) -> FinalReport:
-        a_vec = self._clamp_vector(self.analysis.aggregate_feature_vector, 56)
+        a_vec = self._pad_analysis_vector()
         v_vec = self._clamp_vector(self.validation.aggregate_anomaly_vector, 16)
         s_vec = self._clamp_vector(self.security.feature_vector, 18)
 

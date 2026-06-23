@@ -73,7 +73,7 @@ def bump_action_yml(new_version: str) -> None:
 
 
 def bump_dashboard(new_version: str) -> None:
-    path = Path("dashboard.py")
+    path = Path("tools/dashboard.py")
     content = path.read_text(encoding="utf-8")
     content = re.sub(
         r'(Omni-Auditor\s+v)[\d.]+',

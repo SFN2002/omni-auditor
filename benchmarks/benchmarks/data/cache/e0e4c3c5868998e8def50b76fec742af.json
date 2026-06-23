@@ -1,0 +1,10 @@
+{
+  "id": "e0e4c3c5868998e8def50b76fec742af",
+  "source": "https://github.com/snoopysecurity/Vulnerable-Code-Snippets/blob/master/Path Traversal/py_ctf.py",
+  "cache_path": "cache\\e0e4c3c5868998e8def50b76fec742af.py",
+  "label": "VULNERABLE",
+  "owner": "snoopysecurity",
+  "repo": "Vulnerable-Code-Snippets",
+  "path": "Path Traversal/py_ctf.py",
+  "size": 1770
+}

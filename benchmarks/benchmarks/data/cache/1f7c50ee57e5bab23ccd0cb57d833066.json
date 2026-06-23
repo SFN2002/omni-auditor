@@ -1,0 +1,10 @@
+{
+  "id": "1f7c50ee57e5bab23ccd0cb57d833066",
+  "source": "https://github.com/OWASP/Vulnerable-Web-Applications-Directory/blob/master/.github/workflows/scripts/scout.py",
+  "cache_path": "cache\\1f7c50ee57e5bab23ccd0cb57d833066.py",
+  "label": "VULNERABLE",
+  "owner": "OWASP",
+  "repo": "Vulnerable-Web-Applications-Directory",
+  "path": ".github/workflows/scripts/scout.py",
+  "size": 6143
+}

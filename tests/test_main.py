@@ -54,8 +54,9 @@ class TestFusionEngine(unittest.TestCase):
         self.assertAlmostEqual(float(sum(weights)), 1.0, places=5)
 
     def test_risk_tier_assignment(self) -> None:
-        # eval() should produce a CRITICAL finding
-        code = "eval(user_input)\n"
+        # eval() should produce a CRITICAL finding.  Include a function so the
+        # statistical validator has at least two population samples.
+        code = "def foo():\n    eval(user_input)\n"
         final = asyncio.run(_run_full_pipeline(code))
         self.assertEqual(final.risk_tier, "CRITICAL")
 
@@ -174,6 +175,114 @@ class TestCliArgs(unittest.TestCase):
         finally:
             temp_path.unlink(missing_ok=True)
             baseline_file.unlink(missing_ok=True)
+
+    def test_quiet_produces_one_line_summary(self) -> None:
+        temp_path = self._write_temp_py("def foo():\n    return 1\n")
+        try:
+            result = subprocess.run(
+                [sys.executable, "-m", "src.main", str(temp_path), "--quiet"],
+                capture_output=True,
+                text=True,
+                cwd=str(_REPO_ROOT),
+            )
+            self.assertEqual(result.returncode, 0, f"stderr: {result.stderr}")
+            # One-line format: "<path>: TIER (score: 0.XX)"
+            self.assertIn(":", result.stdout)
+            self.assertIn("(score:", result.stdout)
+            # No Rich markup in stdout.
+            self.assertNotIn("[", result.stdout)
+        finally:
+            temp_path.unlink(missing_ok=True)
+
+    def test_quiet_with_json_produces_json(self) -> None:
+        temp_path = self._write_temp_py("def foo():\n    return 1\n")
+        try:
+            result = subprocess.run(
+                [sys.executable, "-m", "src.main", str(temp_path), "--quiet", "--json"],
+                capture_output=True,
+                text=True,
+                cwd=str(_REPO_ROOT),
+            )
+            self.assertEqual(result.returncode, 0, f"stderr: {result.stderr}")
+            data = json.loads(result.stdout)
+            self.assertIn("risk_tier", data)
+        finally:
+            temp_path.unlink(missing_ok=True)
+
+    def test_json_includes_exit_code_note(self) -> None:
+        temp_path = self._write_temp_py("eval(user_input)\n")
+        try:
+            result = subprocess.run(
+                [sys.executable, "-m", "src.main", str(temp_path), "--json"],
+                capture_output=True,
+                text=True,
+                cwd=str(_REPO_ROOT),
+            )
+            self.assertEqual(result.returncode, 2)
+            data = json.loads(result.stdout)
+            self.assertIn("exit_code", data)
+            self.assertIn("exit_code_note", data)
+            self.assertEqual(data["exit_code"], 2)
+            self.assertIn("CRITICAL", data["exit_code_note"])
+        finally:
+            temp_path.unlink(missing_ok=True)
+
+    def test_quiet_includes_exit_code_note(self) -> None:
+        temp_path = self._write_temp_py("eval(user_input)\n")
+        try:
+            result = subprocess.run(
+                [sys.executable, "-m", "src.main", str(temp_path), "--quiet"],
+                capture_output=True,
+                text=True,
+                cwd=str(_REPO_ROOT),
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("Exiting with code 2", result.stdout)
+        finally:
+            temp_path.unlink(missing_ok=True)
+
+    def test_exit_code_critical(self) -> None:
+        temp_path = self._write_temp_py("eval(user_input)\n")
+        try:
+            result = subprocess.run(
+                [sys.executable, "-m", "src.main", str(temp_path), "--quiet"],
+                capture_output=True,
+                text=True,
+                cwd=str(_REPO_ROOT),
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("CRITICAL", result.stdout)
+        finally:
+            temp_path.unlink(missing_ok=True)
+
+    def test_quiet_save_baseline_suppresses_rich_message(self) -> None:
+        temp_path = self._write_temp_py("def foo():\n    return 1\n")
+        baseline_file = _REPO_ROOT / ".omni_cache" / "baselines" / "cli-quiet-save-test.json"
+        try:
+            result = subprocess.run(
+                [sys.executable, "-m", "src.main", str(temp_path), "--quiet", "--save-baseline", "cli-quiet-save-test"],
+                capture_output=True,
+                text=True,
+                cwd=str(_REPO_ROOT),
+            )
+            self.assertEqual(result.returncode, 0, f"stderr: {result.stderr}")
+            self.assertTrue(baseline_file.exists())
+            # Rich success message should be suppressed.
+            self.assertNotIn("Baseline saved", result.stdout)
+        finally:
+            temp_path.unlink(missing_ok=True)
+            baseline_file.unlink(missing_ok=True)
+
+
+    def test_analysis_pipeline_auto_skips_validator_without_population(self) -> None:
+        """When no population is available the pipeline should skip the validator gracefully."""
+        pipeline = AnalysisPipeline("def foo():\n    return 1\n")
+        self.assertTrue(pipeline.skip_validator)
+
+    def test_analysis_pipeline_respects_explicit_skip_validator_false(self) -> None:
+        """An explicit skip_validator=False should not be overridden by auto-detection."""
+        pipeline = AnalysisPipeline("def foo():\n    return 1\n", skip_validator=False)
+        self.assertFalse(pipeline.skip_validator)
 
 
 # ---------------------------------------------------------------------------

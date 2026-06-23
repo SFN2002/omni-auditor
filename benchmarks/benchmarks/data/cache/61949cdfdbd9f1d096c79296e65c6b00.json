@@ -1,0 +1,10 @@
+{
+  "id": "61949cdfdbd9f1d096c79296e65c6b00",
+  "source": "https://github.com/snoopysecurity/Vulnerable-Code-Snippets/blob/master/Unsafe Deserialization/CVE-2017-2809.py",
+  "cache_path": "cache\\61949cdfdbd9f1d096c79296e65c6b00.py",
+  "label": "VULNERABLE",
+  "owner": "snoopysecurity",
+  "repo": "Vulnerable-Code-Snippets",
+  "path": "Unsafe Deserialization/CVE-2017-2809.py",
+  "size": 312
+}

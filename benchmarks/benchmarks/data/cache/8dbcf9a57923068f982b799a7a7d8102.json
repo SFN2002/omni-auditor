@@ -1,0 +1,10 @@
+{
+  "id": "8dbcf9a57923068f982b799a7a7d8102",
+  "source": "https://github.com/snoopysecurity/Vulnerable-Code-Snippets/blob/master/Server Side Template Injection/test.py",
+  "cache_path": "cache\\8dbcf9a57923068f982b799a7a7d8102.py",
+  "label": "VULNERABLE",
+  "owner": "snoopysecurity",
+  "repo": "Vulnerable-Code-Snippets",
+  "path": "Server Side Template Injection/test.py",
+  "size": 268
+}

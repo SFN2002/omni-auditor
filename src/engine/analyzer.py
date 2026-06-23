@@ -42,7 +42,7 @@ import logging
 import shutil
 import uuid
 import warnings
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from pathlib import Path
 from typing import Any
 
@@ -623,6 +623,14 @@ class SpectralProfile:
     feature_vector: NDArray[np.float64]
 
 
+# Field names that correspond to NumPy arrays in the spectral profile.
+# Kept as a module-level constant so cache (de)serialisation can iterate
+# over array fields without constructing a dummy ``SpectralProfile``.
+_SPECTRAL_ARRAY_FIELDS: tuple[str, ...] = tuple(
+    field.name for field in fields(SpectralProfile) if field.type == "NDArray[np.float64]"
+)
+
+
 class SpectralGraphAnalyzer:
     """Applies rigorous Spectral Graph Theory to a ``ControlFlowGraph``.
 
@@ -1012,18 +1020,7 @@ class CacheManager:
 
     @staticmethod
     def _spectral_to_arrays(profile: SpectralProfile) -> dict[str, NDArray[np.float64]]:
-        return {
-            "adjacency_directed": profile.adjacency_directed,
-            "adjacency_undirected": profile.adjacency_undirected,
-            "degree_matrix": profile.degree_matrix,
-            "laplacian_combinatorial": profile.laplacian_combinatorial,
-            "laplacian_normalized": profile.laplacian_normalized,
-            "laplacian_random_walk": profile.laplacian_random_walk,
-            "eigenvalues_combinatorial": profile.eigenvalues_combinatorial,
-            "eigenvalues_normalized": profile.eigenvalues_normalized,
-            "eigenvectors_combinatorial": profile.eigenvectors_combinatorial,
-            "feature_vector": profile.feature_vector,
-        }
+        return {name: getattr(profile, name) for name in _SPECTRAL_ARRAY_FIELDS}
 
     @staticmethod
     def _spectral_from_arrays(data: dict[str, NDArray[np.float64]]) -> SpectralProfile:
@@ -1101,32 +1098,12 @@ class CacheManager:
 
         try:
             module_spectral = self._spectral_from_arrays(
-                {k: raw[f"module_spectral.{k}"] for k in self._spectral_to_arrays(SpectralProfile(
-                    adjacency_directed=np.zeros((1,1)), adjacency_undirected=np.zeros((1,1)),
-                    degree_matrix=np.zeros((1,1)), laplacian_combinatorial=np.zeros((1,1)),
-                    laplacian_normalized=np.zeros((1,1)), laplacian_random_walk=np.zeros((1,1)),
-                    eigenvalues_combinatorial=np.zeros(1), eigenvalues_normalized=np.zeros(1),
-                    eigenvectors_combinatorial=np.zeros((1,1)), feature_vector=np.zeros(14),
-                    fiedler_value=0.0, spectral_gap=0.0, algebraic_connectivity=0.0,
-                    spectral_radius=0.0, von_neumann_entropy=0.0, renyi_entropy_2=0.0,
-                    graph_energy=0.0, modularity_index=0.0, effective_rank=0.0,
-                    normalized_fiedler=0.0, eigengap_ratio=0.0, spectral_discrepancy=0.0,
-                )).keys()}
+                {k: raw[f"module_spectral.{k}"] for k in _SPECTRAL_ARRAY_FIELDS}
             )
             function_spectrals: dict[str, SpectralProfile] = {}
             for func_key in meta["function_keys"]:
                 function_spectrals[func_key] = self._spectral_from_arrays(
-                    {k: raw[f"function_spectrals.{func_key}.{k}"] for k in self._spectral_to_arrays(SpectralProfile(
-                        adjacency_directed=np.zeros((1,1)), adjacency_undirected=np.zeros((1,1)),
-                        degree_matrix=np.zeros((1,1)), laplacian_combinatorial=np.zeros((1,1)),
-                        laplacian_normalized=np.zeros((1,1)), laplacian_random_walk=np.zeros((1,1)),
-                        eigenvalues_combinatorial=np.zeros(1), eigenvalues_normalized=np.zeros(1),
-                        eigenvectors_combinatorial=np.zeros((1,1)), feature_vector=np.zeros(14),
-                        fiedler_value=0.0, spectral_gap=0.0, algebraic_connectivity=0.0,
-                        spectral_radius=0.0, von_neumann_entropy=0.0, renyi_entropy_2=0.0,
-                        graph_energy=0.0, modularity_index=0.0, effective_rank=0.0,
-                        normalized_fiedler=0.0, eigengap_ratio=0.0, spectral_discrepancy=0.0,
-                    )).keys()}
+                    {k: raw[f"function_spectrals.{func_key}.{k}"] for k in _SPECTRAL_ARRAY_FIELDS}
                 )
             module_cfg = self._dict_to_cfg(meta["module_cfg"])
             function_cfgs = {
@@ -1257,8 +1234,11 @@ class Analyzer:
     ) -> NDArray[np.float64]:
         module_vec = module_spectral.feature_vector
         if not function_spectrals:
-            pad = np.zeros_like(module_vec)
-            return np.concatenate([module_vec, pad, pad, pad])
+            # For functionless files, avoid filling 75% of the aggregate vector
+            # with meaningless zeros.  Downstream fusion will pad this 14-D
+            # module descriptor to 56-D using the module vector itself so the
+            # structural signal stays intact.
+            return module_vec.copy()
 
         func_matrix = np.stack(
             [sp.feature_vector for sp in function_spectrals.values()]

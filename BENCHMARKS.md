@@ -1,5 +1,9 @@
 # Security Benchmark: Omni-Auditor vs Bandit
 
+> **Note:** The benchmark runner that produced this report has moved to
+> [`tools/run_benchmark.py`](../tools/run_benchmark.py). A new, larger-scale
+> benchmark framework is also available in [`benchmarks/`](../benchmarks/).
+
 ## Executive Summary
 
 This benchmark compares **Omni-Auditor** (spectral graph theory + security scanning) against **Bandit** (the standard Python security linter) on a curated dataset of real-world Python files drawn from public repositories and vulnerability snippet collections.

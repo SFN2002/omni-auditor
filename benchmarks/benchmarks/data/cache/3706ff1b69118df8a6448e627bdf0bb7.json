@@ -1,0 +1,10 @@
+{
+  "id": "3706ff1b69118df8a6448e627bdf0bb7",
+  "source": "https://github.com/OWASP/Vulnerable-Web-Applications-Directory/blob/master/.github/workflows/scripts/check_links.py",
+  "cache_path": "cache\\3706ff1b69118df8a6448e627bdf0bb7.py",
+  "label": "VULNERABLE",
+  "owner": "OWASP",
+  "repo": "Vulnerable-Web-Applications-Directory",
+  "path": ".github/workflows/scripts/check_links.py",
+  "size": 5084
+}
